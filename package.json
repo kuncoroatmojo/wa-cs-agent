@@ -1,0 +1,53 @@
+{
+  "name": "wa-cs-agent",
+  "private": true,
+  "version": "1.0.0",
+  "description": "WhatsApp AI Customer Support Assistant with RAG capabilities",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write .",
+    "test": "vitest",
+    "clean": "rm -rf dist node_modules/.vite",
+    "deploy": "npm run build && vercel --prod"
+  },
+  "dependencies": {
+    "@headlessui/react": "^2.2.4",
+    "@heroicons/react": "^2.2.0",
+    "@supabase/supabase-js": "^2.50.0",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/postcss": "^4.1.10",
+    "@tanstack/react-query": "^5.80.6",
+    "autoprefixer": "^10.4.21",
+    "axios": "^1.9.0",
+    "date-fns": "^4.1.0",
+    "file-saver": "^2.0.5",
+    "lucide-react": "^0.514.0",
+    "qrcode.js": "^0.0.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.2",
+    "recharts": "^2.15.3",
+    "socket.io-client": "^4.8.1",
+    "tailwindcss": "^4.1.9",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.4.1",
+    "eslint": "^9.25.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "globals": "^16.0.0",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.30.1",
+    "vite": "^6.3.5"
+  }
+}

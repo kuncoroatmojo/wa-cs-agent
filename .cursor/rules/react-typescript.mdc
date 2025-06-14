@@ -1,0 +1,147 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# React + TypeScript Project Structure Guide
+
+## Project Overview
+This is a modern React + TypeScript project using Vite and Tailwind CSS. The project follows a component-based architecture with a focus on type safety and modern development practices.
+
+## Key Technologies
+- React 19
+- TypeScript 5
+- Vite
+- Tailwind CSS
+- Radix UI Components
+- React Hook Form
+- Zod for validation
+- Zustand for state management
+
+## Project Structure
+- `src/` - Main source code directory
+  - `components/` - Reusable React components
+  - `App.tsx` - Main application component
+  - `main.tsx` - Application entry point
+  - `index.css` - Global styles
+- `public/` - Static assets
+- `styles/` - Additional styling files
+- `hooks/` - Custom React hooks
+- `lib/` - Utility functions and shared code
+
+## TypeScript Configuration
+1. Enable strict mode in tsconfig.json:
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true
+  }
+}
+```
+
+2. Explicitly type function returns and object literals
+3. Minimize use of @ts-ignore/@ts-expect-error
+4. Use proper type imports from React:
+```typescript
+import { type FC, type ReactNode } from 'react';
+```
+
+## Component Guidelines
+1. Use TypeScript interfaces for props:
+```typescript
+interface ButtonProps {
+  variant: 'primary' | 'secondary';
+  children: React.ReactNode;
+  onClick?: () => void;
+}
+```
+
+2. Use function components with explicit return types:
+```typescript
+export function Button({ variant, children, onClick }: ButtonProps) {
+  return (
+    <button className={`btn-${variant}`} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+```
+
+3. Follow these component best practices:
+   - Call hooks only at the top level
+   - Extract reusable logic into custom hooks
+   - Memoize with React.memo, useCallback, useMemo where appropriate
+   - Avoid inline functions in JSX
+   - Favor composition over inheritance
+   - Use React.lazy + Suspense for code splitting
+   - Use refs only for direct DOM access
+   - Prefer controlled components for forms
+   - Implement error boundaries
+   - Clean up effects in useEffect
+   - Use guard clauses for error handling
+
+## State Management
+1. Use Zustand for global state management
+2. Lift state up before introducing context
+3. Use React Context for intermediate, tree-wide sharing
+4. Use React hooks for local state
+5. Follow the principle of lifting state up when necessary
+
+## Styling Guidelines
+1. Use Tailwind CSS for styling components
+2. Follow the utility-first approach
+3. Use the `cn()` utility for conditional class names
+4. Leverage Radix UI components for accessible UI elements
+5. Keep global styles minimal (reset, typography)
+
+## Forms & Validation
+1. Use React Hook Form for form handling:
+```typescript
+const { register, handleSubmit } = useForm<FormData>({
+  resolver: zodResolver(formSchema)
+});
+```
+
+2. Implement proper form validation with Zod
+3. Use controlled components
+4. Handle form errors gracefully
+
+## Error Handling
+1. Use proper error boundaries
+2. Implement proper form validation
+3. Show user-friendly error messages
+4. Log errors appropriately
+5. Use guard clauses for error handling
+
+## Performance Optimization
+1. Use React.memo for expensive components
+2. Implement proper code splitting with React.lazy
+3. Optimize images and assets
+4. Use proper key props in lists
+5. Memoize callbacks and values appropriately
+
+## Accessibility
+1. Use semantic HTML elements
+2. Implement proper ARIA attributes
+3. Ensure keyboard navigation
+4. Test with screen readers
+5. Follow WCAG guidelines
+
+## Code Style
+1. Use ESLint and Prettier
+2. Follow consistent naming conventions
+3. Write meaningful comments
+4. Keep functions pure when possible
+5. Use proper TypeScript types and interfaces
+
+## References
+- [React Documentation](mdc:https:/react.dev)
+- [TypeScript Documentation](mdc:https:/www.typescriptlang.org/docs)
+- [Tailwind CSS Documentation](mdc:https:/tailwindcss.com/docs)
+- [Radix UI Documentation](mdc:https:/www.radix-ui.com/docs)
+- [Zustand Documentation](mdc:https:/github.com/pmndrs/zustand)
+- [React Hook Form Documentation](mdc:https:/react-hook-form.com)
+- [Zod Documentation](mdc:https:/zod.dev)
