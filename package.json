@@ -13,7 +13,8 @@
     "format": "prettier --write .",
     "test": "vitest",
     "clean": "rm -rf dist node_modules/.vite",
-    "deploy": "npm run build && vercel --prod"
+    "deploy": "npm run build && vercel --prod",
+    "create-test-user": "node scripts/create-test-user.js"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",
@@ -25,6 +26,7 @@
     "autoprefixer": "^10.4.21",
     "axios": "^1.9.0",
     "date-fns": "^4.1.0",
+    "dotenv": "^16.5.0",
     "file-saver": "^2.0.5",
     "lucide-react": "^0.514.0",
     "qrcode.js": "^0.0.1",

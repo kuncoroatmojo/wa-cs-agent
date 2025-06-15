@@ -83,13 +83,7 @@ const Login: React.FC = () => {
             Sign in to your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link
-              to="/register"
-              className="font-medium text-primary-600 hover:text-primary-500"
-            >
-              create a new account
-            </Link>
+            Welcome to WhatsApp AI Assistant
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>

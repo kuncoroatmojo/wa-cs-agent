@@ -9,7 +9,6 @@ import LoadingSpinner from './components/LoadingSpinner';
 
 // Pages
 import Login from './pages/Login';
-import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import WhatsAppInstances from './pages/WhatsAppInstances';
 import Conversations from './pages/Conversations';
@@ -93,14 +92,7 @@ function App() {
                 </PublicRoute>
               }
             />
-            <Route
-              path="/register"
-              element={
-                <PublicRoute>
-                  <Register />
-                </PublicRoute>
-              }
-            />
+
 
             {/* Protected Routes */}
             <Route
