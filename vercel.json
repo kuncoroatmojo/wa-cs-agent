@@ -8,24 +8,8 @@
   "env": {
     "NODE_ENV": "production"
   },
-  "build": {
-    "env": {
-      "VITE_SUPABASE_URL": "@supabase-url",
-      "VITE_SUPABASE_ANON_KEY": "@supabase-anon-key",
-      "VITE_EVOLUTION_API_URL": "@evolution-api-url",
-      "VITE_EVOLUTION_API_KEY": "@evolution-api-key",
-      "VITE_OPENAI_API_KEY": "@openai-api-key",
-      "VITE_GOOGLE_CLIENT_ID": "@google-client-id",
-      "VITE_APP_URL": "@app-url",
-      "VITE_WEBHOOK_URL": "@webhook-url"
-    }
-  },
-  "functions": {
-    "app/api/**": {
-      "runtime": "nodejs18.x",
-      "maxDuration": 30
-    }
-  },
+
+
   "headers": [
     {
       "source": "/(.*)",
