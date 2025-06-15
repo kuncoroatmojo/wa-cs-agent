@@ -1,8 +1,10 @@
 import { supabase } from '../lib/supabase';
 import type { WhatsAppInstance, Message } from '../types';
 
-const EVOLUTION_API_BASE = (import.meta as any).env?.VITE_EVOLUTION_API_URL || 'http://localhost:8080';
-const EVOLUTION_API_KEY = (import.meta as any).env?.VITE_EVOLUTION_API_KEY || '';
+// Evolution API will be accessed through your backend API routes for security
+// These constants are for fallback/development only
+const EVOLUTION_API_BASE = 'http://localhost:8080'; // Development fallback
+const EVOLUTION_API_KEY = ''; // Will be handled server-side
 
 interface ApiResponse<T = any> {
   success: boolean;
