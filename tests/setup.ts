@@ -2,7 +2,7 @@ import '@testing-library/jest-dom'
 import { beforeAll, afterEach, afterAll, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import { setupServer } from 'msw/node'
-import { rest } from 'msw'
+import { http, HttpResponse } from 'msw'
 
 // Mock Supabase client
 const mockSupabaseClient = {
@@ -108,30 +108,24 @@ Object.defineProperty(window, 'matchMedia', {
 // MSW server for API mocking
 export const server = setupServer(
   // Default handlers
-  rest.post('https://api.openai.com/v1/chat/completions', (req, res, ctx) => {
-    return res(
-      ctx.json({
-        choices: [{ message: { content: 'Test AI response' } }],
-        usage: { total_tokens: 100 }
-      })
-    )
+  http.post('https://api.openai.com/v1/chat/completions', () => {
+    return HttpResponse.json({
+      choices: [{ message: { content: 'Test AI response' } }],
+      usage: { total_tokens: 100 }
+    })
   }),
   
-  rest.post('https://api.openai.com/v1/embeddings', (req, res, ctx) => {
-    return res(
-      ctx.json({
-        data: [{ embedding: new Array(1536).fill(0.1) }]
-      })
-    )
+  http.post('https://api.openai.com/v1/embeddings', () => {
+    return HttpResponse.json({
+      data: [{ embedding: new Array(1536).fill(0.1) }]
+    })
   }),
   
-  rest.post('https://api.anthropic.com/v1/messages', (req, res, ctx) => {
-    return res(
-      ctx.json({
-        content: [{ text: 'Test Claude response' }],
-        usage: { input_tokens: 50, output_tokens: 50 }
-      })
-    )
+  http.post('https://api.anthropic.com/v1/messages', () => {
+    return HttpResponse.json({
+      content: [{ text: 'Test Claude response' }],
+      usage: { input_tokens: 50, output_tokens: 50 }
+    })
   })
 )
 

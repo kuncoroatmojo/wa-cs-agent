@@ -6,7 +6,6 @@
  */
 
 import { existsSync, readFileSync } from 'fs'
-import { join } from 'path'
 
 interface ValidationResult {
   category: string
@@ -169,7 +168,7 @@ class Phase6Validator {
           passed: vercelConfig.regions && Array.isArray(vercelConfig.regions),
           message: 'Multi-region deployment configured'
         })
-      } catch (error) {
+      } catch (_error) {
         tests.push({
           name: 'Vercel Config Validation',
           passed: false,

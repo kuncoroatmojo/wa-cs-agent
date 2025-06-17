@@ -80,7 +80,7 @@ const Register: React.FC = () => {
       } else {
         setErrors({ submit: result.error || 'Registration failed' });
       }
-    } catch (error) {
+    } catch (_error) {
       setErrors({ submit: 'An unexpected error occurred' });
     } finally {
       setIsLoading(false);

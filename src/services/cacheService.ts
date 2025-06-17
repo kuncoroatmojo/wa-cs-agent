@@ -117,7 +117,7 @@ export class CacheService {
     namespace: string, 
     key: string, 
     value: T, 
-    customTTL?: number
+    _customTTL?: number
   ): boolean {
     const cache = this.caches.get(namespace)
     const config = this.configs.get(namespace)
