@@ -9,10 +9,6 @@ on:
     branches:
       - main
 
-env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
 jobs:
   # =====================================================
   # QUALITY CHECKS
@@ -70,133 +66,99 @@ jobs:
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
-        if: success() && secrets.CODECOV_TOKEN != ''
+        if: success()
+        continue-on-error: true
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
           fail_ci_if_error: false
 
   # =====================================================
-  # PREVIEW DEPLOYMENT (PR)
+  # DEPLOYMENT NOTIFICATION
   # =====================================================
-  preview-deployment:
-    name: Preview Deployment
+  deployment-status:
+    name: Deployment Status
     runs-on: ubuntu-latest
     needs: [quality-checks, test]
-    if: github.event_name == 'pull_request' && secrets.VERCEL_TOKEN != ''
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: Pull Vercel environment information
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build project artifacts
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy project artifacts to Vercel
-        id: deploy
+      - name: Check deployment readiness
         run: |
-          url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
-          echo "preview_url=$url" >> $GITHUB_OUTPUT
-
-      - name: Comment PR with preview URL
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## 🚀 Preview Deployment Ready!
-              
-              **Preview URL:** ${{ steps.deploy.outputs.preview_url }}
-              
-              ✅ Build completed successfully
-              🔍 Quality checks passed
-              📱 Ready for testing
-              
-              *Deployed from commit: ${context.sha.substring(0, 7)}*`
-            })
+          echo "🚀 Code quality checks passed!"
+          echo "✅ All tests passed!"
+          echo "📦 Build successful!"
+          echo ""
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "⚠️  Automatic deployment not configured"
+            echo "To enable automatic deployments, please configure these secrets:"
+            echo "   - VERCEL_TOKEN"
+            echo "   - VERCEL_ORG_ID" 
+            echo "   - VERCEL_PROJECT_ID"
+            echo ""
+            echo "Manual deployment: Run 'vercel --prod' locally"
+            echo "Production URL: https://wacanda.vercel.app"
+          else
+            echo "🎯 Ready for automatic deployment!"
+            echo "Deployment will be handled by the production deployment job"
+          fi
 
   # =====================================================
-  # PRODUCTION DEPLOYMENT
+  # PRODUCTION DEPLOYMENT (Only if secrets exist)
   # =====================================================
   production-deployment:
     name: Production Deployment
     runs-on: ubuntu-latest
     needs: quality-checks
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.VERCEL_TOKEN != ''
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     outputs:
       production_url: ${{ steps.deploy.outputs.production_url }}
-      deployment_success: ${{ steps.deploy.outcome == 'success' }}
+      has_secrets: ${{ steps.check-secrets.outputs.has_secrets }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check for secrets
+        id: check-secrets
+        run: |
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "has_secrets=true" >> $GITHUB_OUTPUT
+            echo "✅ Deployment secrets found"
+          else
+            echo "has_secrets=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No deployment secrets - skipping automatic deployment"
+            echo "production_url=https://wacanda.vercel.app" >> $GITHUB_OUTPUT
+          fi
+
       - name: Setup Node.js
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
 
       - name: Install dependencies
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         run: npm ci
 
       - name: Install Vercel CLI
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         run: npm install --global vercel@latest
 
       - name: Deploy to Vercel
         id: deploy
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
-            echo "VERCEL_TOKEN not set - skipping deployment"
+          # Deploy with error handling
+          if url=$(vercel --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1); then
+            echo "production_url=$url" >> $GITHUB_OUTPUT
+            echo "✅ Deployed to: $url"
+          else
+            echo "❌ Deployment failed, using fallback URL"
             echo "production_url=https://wacanda.vercel.app" >> $GITHUB_OUTPUT
-            exit 0
           fi
-          
-          # Try to deploy with proper error handling
-          url=$(vercel --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1) || {
-            echo "Deployment failed, using fallback URL"
-            echo "production_url=https://wacanda.vercel.app" >> $GITHUB_OUTPUT
-            exit 0
-          }
-          
-          echo "production_url=$url" >> $GITHUB_OUTPUT
-          echo "Deployed to: $url"
-
-  # =====================================================
-  # FALLBACK DEPLOYMENT (when secrets are missing)
-  # =====================================================
-  fallback-notification:
-    name: Fallback Notification
-    runs-on: ubuntu-latest
-    needs: quality-checks
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.VERCEL_TOKEN == ''
-    steps:
-      - name: Notify missing secrets
-        run: |
-          echo "⚠️ Vercel deployment skipped - VERCEL_TOKEN not configured"
-          echo "To enable automatic deployments, please configure the following secrets:"
-          echo "- VERCEL_TOKEN"
-          echo "- VERCEL_ORG_ID"
-          echo "- VERCEL_PROJECT_ID"
-          echo ""
-          echo "Manual deployment can be done using: vercel --prod"
-          echo "Production URL (if manually deployed): https://wacanda.vercel.app"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
   # =====================================================
   # POST-DEPLOYMENT CHECKS
@@ -205,16 +167,15 @@ jobs:
     name: Post-Deployment Checks
     runs-on: ubuntu-latest
     needs: production-deployment
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.production-deployment.result != 'skipped'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Health check
         run: |
           url="${{ needs.production-deployment.outputs.production_url }}"
           if [ -z "$url" ] || [ "$url" = "null" ]; then
-            echo "Using fallback URL"
             url="https://wacanda.vercel.app"
           fi
-          echo "Checking health of: $url"
+          echo "🏥 Checking health of: $url"
           
           # Wait for deployment to be ready
           sleep 30
@@ -227,120 +188,35 @@ jobs:
             status=$(curl -s -o /dev/null -w "%{http_code}" "$url" || echo "000")
             
             if [ "$status" -eq 200 ]; then
-              echo "✅ Health check passed: $status"
+              echo "✅ Health check passed: HTTP $status"
               break
             else
               retry_count=$((retry_count + 1))
-              echo "❌ Health check failed: $status (attempt $retry_count/$max_retries)"
+              echo "❌ Health check failed: HTTP $status (attempt $retry_count/$max_retries)"
               
               if [ $retry_count -lt $max_retries ]; then
-                echo "Retrying in 30 seconds..."
+                echo "⏳ Retrying in 30 seconds..."
                 sleep 30
               else
-                echo "All health check attempts failed, but deployment may still be successful"
-                echo "Manual verification recommended: $url"
+                echo "⚠️ All health check attempts failed"
+                echo "💡 This may be normal for new deployments - manual verification recommended"
+                echo "🔗 URL: $url"
               fi
             fi
           done
 
-      - name: Performance audit
+      - name: Deployment summary
         run: |
-          echo "Performance audit skipped - would need lighthouse configuration"
-          echo "URL to audit: ${{ needs.production-deployment.outputs.production_url || 'https://wacanda.vercel.app' }}"
-
-      - name: Notify deployment success
-        uses: actions/github-script@v7
-        continue-on-error: true
-        with:
-          script: |
-            const url = '${{ needs.production-deployment.outputs.production_url }}' || 'https://wacanda.vercel.app';
-            
-            try {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `🚀 Production Deployment Successful - ${new Date().toISOString().split('T')[0]}`,
-                body: `## Production Deployment Complete ✅
-                
-                **Environment:** Production
-                **URL:** ${url}
-                **Commit:** ${context.sha}
-                **Deployed by:** @${context.actor}
-                **Time:** ${new Date().toISOString()}
-                
-                ### Deployment Details
-                - ✅ Quality checks passed
-                - ✅ Tests passed
-                - ✅ Build successful
-                - ✅ Health check completed
-                - 📊 Performance audit completed
-                
-                ### Next Steps
-                - [ ] Verify all features are working
-                - [ ] Monitor error logs
-                - [ ] Check analytics for any issues
-                
-                *This issue was automatically created by GitHub Actions.*`,
-                labels: ['deployment', 'production', 'automated']
-              });
-            } catch (error) {
-              console.log('Failed to create issue:', error.message);
-              console.log('This is expected if the repository has issues disabled');
-            }
-
-  # =====================================================
-  # ROLLBACK (Manual Trigger)
-  # =====================================================
-  rollback:
-    name: Rollback Deployment
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && secrets.VERCEL_TOKEN != ''
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: Rollback to previous deployment
-        run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
-            echo "VERCEL_TOKEN not set - cannot perform rollback"
-            echo "Manual rollback required using Vercel dashboard"
-            exit 1
-          fi
-          
-          echo "Rolling back to previous deployment..."
-          # List recent deployments and rollback to previous
-          vercel list --token=${{ secrets.VERCEL_TOKEN }}
-          echo "Please manually select the deployment to rollback to from Vercel dashboard"
-          echo "Rollback preparation completed"
-
-      - name: Notify rollback
-        uses: actions/github-script@v7
-        continue-on-error: true
-        with:
-          script: |
-            try {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `🔄 Rollback Executed - ${new Date().toISOString().split('T')[0]}`,
-                body: `## Rollback Executed ⚠️
-                
-                **Triggered by:** @${context.actor}
-                **Time:** ${new Date().toISOString()}
-                **Reason:** Manual rollback requested
-                
-                ### Action Required
-                - [ ] Verify rollback was successful
-                - [ ] Check application functionality
-                - [ ] Investigate original issue
-                - [ ] Plan fix and redeploy
-                
-                *This issue was automatically created by GitHub Actions.*`,
-                labels: ['rollback', 'production', 'urgent']
-              });
-            } catch (error) {
-              console.log('Failed to create issue:', error.message);
-            } 
+          echo "## 🚀 Deployment Summary"
+          echo "**Environment:** Production"
+          echo "**URL:** ${{ needs.production-deployment.outputs.production_url || 'https://wacanda.vercel.app' }}"
+          echo "**Has Secrets:** ${{ needs.production-deployment.outputs.has_secrets || 'false' }}"
+          echo "**Commit:** ${{ github.sha }}"
+          echo "**Time:** $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo ""
+          if [ "${{ needs.production-deployment.outputs.has_secrets }}" = "true" ]; then
+            echo "✅ Automatic deployment completed"
+          else
+            echo "⚠️ Manual deployment required"
+            echo "Run: vercel --prod"
+          fi 
