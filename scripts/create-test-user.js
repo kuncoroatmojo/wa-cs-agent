@@ -1,4 +1,5 @@
-#!/usr/bin/env node
+import { config } from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
 
 /**
  * Create Test User Script
@@ -9,87 +10,157 @@
  * Usage: node scripts/create-test-user.js
  */
 
-import { createClient } from '@supabase/supabase-js';
-import { config } from 'dotenv';
-
 // Load environment variables
-config();
+config({ path: '.env.local' });
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Missing Supabase credentials in .env file');
-  console.log('Please set:');
-  console.log('- VITE_SUPABASE_URL=https://your-project-id.supabase.co');
-  console.log('- VITE_SUPABASE_ANON_KEY=your-anon-key-here');
+  console.error('❌ Missing Supabase environment variables');
+  console.log('Make sure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in .env.local');
   process.exit(1);
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function createTestUser() {
-  const testUser = {
-    email: 'admin@wacanda.com',
-    password: 'admin123456',
-    name: 'Admin User',
-    role: 'admin'
-  };
+// Try multiple email domains that are commonly allowed
+const testEmails = [
+  'admin@gmail.com',
+  'test@gmail.com', 
+  'admin@outlook.com',
+  'test@outlook.com',
+  'admin@yahoo.com',
+  'user@hotmail.com',
+  'admin@protonmail.com',
+  'test@icloud.com'
+];
 
-  console.log('🚀 Creating test user account...');
-  console.log(`📧 Email: ${testUser.email}`);
-  console.log(`🔑 Password: ${testUser.password}`);
+async function createTestUser() {
+  console.log('🚀 Attempting to create test user account...');
+  console.log('🔍 Trying multiple email domains to find allowed ones...');
+  console.log('');
+
+  const password = 'admin123456';
+  const name = 'Test Admin';
+
+  for (const email of testEmails) {
+    console.log(`📧 Trying: ${email}`);
+    
+    try {
+      // First, try to sign up the user
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            name: name,
+            role: 'admin'
+          }
+        }
+      });
+
+      if (signUpError) {
+        if (signUpError.message.includes('already registered')) {
+          console.log(`   ✅ User already exists! Testing sign in...`);
+          
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: email,
+            password: password
+          });
+
+          if (signInError) {
+            console.log(`   ❌ Sign in failed: ${signInError.message}`);
+            continue;
+          }
+
+          console.log(`   🎉 SUCCESS! Working credentials found:`);
+          console.log(`   📧 Email: ${email}`);
+          console.log(`   🔑 Password: ${password}`);
+          console.log(`   👤 User ID: ${signInData.user?.id}`);
+          console.log('');
+          return { email, password, success: true };
+        } else if (signUpError.message.includes('invalid')) {
+          console.log(`   ⚠️  Email domain not allowed: ${signUpError.message}`);
+          continue;
+        } else {
+          console.log(`   ❌ Error: ${signUpError.message}`);
+          continue;
+        }
+      }
+
+      if (signUpData.user) {
+        console.log(`   🎉 SUCCESS! New user created:`);
+        console.log(`   📧 Email: ${email}`);
+        console.log(`   🔑 Password: ${password}`);
+        console.log(`   👤 User ID: ${signUpData.user.id}`);
+        
+        if (signUpData.user.email_confirmed_at) {
+          console.log(`   ✅ Email confirmed - ready to login!`);
+        } else {
+          console.log(`   ⚠️  Email confirmation required`);
+          console.log(`   💡 Check your email or disable email confirmation in Supabase settings`);
+        }
+        console.log('');
+        return { email, password, success: true };
+      }
+
+    } catch (error) {
+      console.log(`   ❌ Unexpected error: ${error.message}`);
+      continue;
+    }
+  }
+
+  console.log('');
+  console.log('❌ No working email domains found!');
+  console.log('');
+  console.log('🔧 SOLUTIONS:');
+  console.log('1. Go to Supabase Dashboard > Authentication > Settings');
+  console.log('2. Scroll down to "Email Auth" section');
+  console.log('3. Either:');
+  console.log('   a) Disable "Restrict email domains" (recommended for development)');
+  console.log('   b) Add allowed domains like "gmail.com, outlook.com, yahoo.com"');
+  console.log('4. Or manually create a user in Supabase Dashboard > Authentication > Users');
+  console.log('');
+  
+  return { success: false };
+}
+
+// Test Supabase connection first
+async function testConnection() {
+  console.log('🔍 Testing Supabase connection...');
+  console.log('🌐 URL:', supabaseUrl);
+  console.log('🔑 API Key:', supabaseAnonKey.substring(0, 20) + '...');
   console.log('');
 
   try {
-    // Create user account
-    const { data, error } = await supabase.auth.signUp({
-      email: testUser.email,
-      password: testUser.password,
-      options: {
-        data: {
-          name: testUser.name,
-          role: testUser.role
-        }
-      }
-    });
-
+    const { data, error } = await supabase.auth.getSession();
     if (error) {
-      if (error.message.includes('already registered')) {
-        console.log('✅ User already exists! You can login with:');
-        console.log(`📧 Email: ${testUser.email}`);
-        console.log(`🔑 Password: ${testUser.password}`);
-        return;
-      }
-      throw error;
+      console.log('⚠️  Connection test warning:', error.message);
+    } else {
+      console.log('✅ Supabase connection successful');
     }
-
-    if (data.user) {
-      console.log('✅ Test user created successfully!');
-      console.log('');
-      console.log('🔐 Login Credentials:');
-      console.log(`📧 Email: ${testUser.email}`);
-      console.log(`🔑 Password: ${testUser.password}`);
-      console.log('');
-      
-      if (data.user.email_confirmed_at) {
-        console.log('✅ Email confirmed - ready to login!');
-      } else {
-        console.log('⚠️  Email confirmation required');
-        console.log('Check your email or disable email confirmation in Supabase Auth settings');
-      }
-    }
-
   } catch (error) {
-    console.error('❌ Error creating test user:', error.message);
+    console.log('❌ Connection failed:', error.message);
+    return false;
+  }
+  
+  return true;
+}
+
+async function main() {
+  const connected = await testConnection();
+  if (connected) {
+    const result = await createTestUser();
     
-    if (error.message.includes('email_address_not_authorized')) {
-      console.log('');
-      console.log('💡 Solution: Go to Supabase Dashboard > Authentication > Settings');
-      console.log('   and disable "Enable email confirmations" for development');
+    if (result.success) {
+      console.log('🎯 READY TO TEST:');
+      console.log('1. Go to your app (local or deployed)');
+      console.log('2. Use the debug tools or login form');
+      console.log(`3. Email: ${result.email}`);
+      console.log(`4. Password: ${result.password}`);
     }
   }
 }
 
-// Run the script
-createTestUser(); 
+main(); 

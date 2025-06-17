@@ -1,26 +1,67 @@
 import { createClient } from '@supabase/supabase-js';
+import type { Database } from '../types/database';
 
 // Environment variables - these should be set in your .env file
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+// Better error handling for missing environment variables
+if (!supabaseUrl) {
+  console.warn('VITE_SUPABASE_URL is not set. Using placeholder for development.');
 }
 
-// Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 10
+if (!supabaseAnonKey) {
+  console.warn('VITE_SUPABASE_ANON_KEY is not set. Using placeholder for development.');
+}
+
+// Create Supabase client with fallback for development
+export const supabase = createClient<Database>(
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseAnonKey || 'placeholder-key',
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10
+      }
     }
   }
-});
+);
+
+// Auth helpers
+export const auth = supabase.auth;
+
+// Real-time subscriptions helper
+export const subscribeToTable = (
+  table: keyof Database['public']['Tables'],
+  callback: (payload: any) => void,
+  filter?: string
+) => {
+  return supabase
+    .channel(`${String(table)}_changes`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: String(table),
+        filter
+      },
+      callback
+    )
+    .subscribe();
+};
+
+// Storage helpers
+export const storage = supabase.storage;
+export const documentsStorage = storage.from('documents');
+
+// Edge Functions helpers
+export const functions = supabase.functions;
 
 // Database types for better TypeScript support
 export interface Database {
@@ -273,42 +314,6 @@ export interface Database {
   };
 }
 
-// Helper functions for common operations
-export const auth = {
-  signUp: async (email: string, password: string, metadata?: any) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: metadata
-      }
-    });
-    return { data, error };
-  },
-  
-  signIn: async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    return { data, error };
-  },
-  
-  signOut: async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error };
-  },
-  
-  getUser: async () => {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    return { user, error };
-  },
-  
-  onAuthStateChange: (callback: (event: string, session: any) => void) => {
-    return supabase.auth.onAuthStateChange(callback);
-  }
-};
-
 // Edge Functions helper
 export const edgeFunctions = {
   invoke: async <T = any>(functionName: string, data?: any): Promise<{ data: T | null; error: any }> => {
@@ -330,12 +335,17 @@ export const vectorSearch = {
     threshold = 0.8,
     count = 10
   ) => {
-    const { data, error } = await supabase.rpc('match_documents', {
-      query_embedding: queryEmbedding,
-      match_threshold: threshold,
-      match_count: count
-    });
-    return { data, error };
+    try {
+      const { data, error } = await supabase.rpc('match_documents', {
+        query_embedding: queryEmbedding,
+        match_threshold: threshold,
+        match_count: count
+      });
+      return { data, error };
+    } catch (error) {
+      console.error('Vector search error:', error);
+      return { data: null, error: { message: 'Vector search service unavailable' } };
+    }
   }
 };
 

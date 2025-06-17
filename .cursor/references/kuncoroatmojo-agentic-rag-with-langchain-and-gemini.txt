@@ -1,0 +1,1340 @@
+Directory structure:
+└── kuncoroatmojo-agentic-rag-with-langchain-and-gemini/
+    ├── README.md
+    ├── App.tsx
+    ├── constants.ts
+    ├── index.html
+    ├── index.tsx
+    ├── metadata.json
+    ├── package.json
+    ├── tool_call.json
+    ├── tsconfig.json
+    ├── types.ts
+    ├── vite.config.ts
+    ├── components/
+    │   ├── Alert.tsx
+    │   ├── ChatHistory.tsx
+    │   ├── ChatInput.tsx
+    │   ├── ChatMessage.tsx
+    │   ├── ChatWindow.tsx
+    │   ├── DocumentList.tsx
+    │   ├── FileUpload.tsx
+    │   ├── Icons.tsx
+    │   ├── ModelSelector.tsx
+    │   └── Spinner.tsx
+    └── services/
+        ├── documentProcessorService.ts
+        └── geminiService.ts
+
+================================================
+FILE: README.md
+================================================
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+## Run Locally
+
+**Prerequisites:**  Node.js
+
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
+
+## System Architecture
+
+This is an **Agentic RAG (Retrieval-Augmented Generation) Assistant** built with React, TypeScript, and LangChain, powered by Google's Gemini AI. The system enables users to upload documents and have intelligent conversations about their content.
+
+### Core Components
+
+#### 🎯 **Frontend Layer (React/TypeScript)**
+- **App.tsx**: Main application orchestrator managing state and component coordination
+- **Components**:
+  - `FileUpload`: Drag-and-drop document upload interface with file validation
+  - `ChatWindow/ChatHistory/ChatMessage/ChatInput`: Complete chat interface for user interactions
+  - `DocumentList`: Visual management of uploaded documents with status tracking
+  - `ModelSelector`: AI model configuration interface
+  - `Alert/Spinner`: User feedback and loading states
+
+#### 🔧 **Service Layer**
+- **Document Processor Service** (`documentProcessorService.ts`):
+  - Multi-format document loader (PDF, DOCX, TXT)
+  - Text chunking using RecursiveCharacterTextSplitter
+  - Document metadata management and error handling
+  
+- **Gemini Service** (`geminiService.ts`):
+  - Google Gemini AI integration
+  - Context formatting and prompt engineering
+  - Chat history management
+  - Error handling and API key validation
+
+#### 🧠 **RAG Pipeline Architecture**
+
+1. **Document Ingestion**:
+   - File upload validation (type, size, count limits)
+   - Multi-format parsing (PDF via WebPDFLoader, DOCX via DocxLoader)
+   - Text extraction and preprocessing
+
+2. **Document Processing**:
+   - Text chunking (1000 chars with 200 char overlap)
+   - Metadata preservation (source file tracking)
+   - Document status management (pending → processing → processed/error)
+
+3. **Retrieval & Generation**:
+   - Context-aware document chunk selection (max 5 chunks)
+   - Chat history integration for conversational continuity
+   - Structured prompt template with system instructions
+   - Gemini AI response generation with temperature control
+
+#### 📊 **Data Flow**
+
+```
+User Upload → File Validation → Document Parsing → Text Chunking → Vector Storage (In-Memory)
+                                                                            ↓
+User Query → Context Retrieval → Prompt Assembly → Gemini API → Response → Chat UI
+            ↑
+    Chat History Context
+```
+
+#### 🔧 **Configuration & Constants**
+- **Supported formats**: PDF, DOCX, TXT
+- **File limits**: 10MB per file, 5 files max
+- **Chunking**: 1000 characters with 200 overlap
+- **AI Model**: Gemini 2.5 Flash (temperature: 0.7, max tokens: 2048)
+- **Context limit**: 5 document chunks per query
+
+#### 🏗 **Technology Stack**
+- **Frontend**: React 19, TypeScript, Vite
+- **AI/ML**: LangChain, Google Gemini API
+- **Document Processing**: LangChain Community Loaders
+- **State Management**: React Hooks (useState, useCallback, useEffect)
+- **Styling**: Utility-first CSS classes
+- **File Handling**: React Dropzone, Browser File API
+
+#### 🔐 **Security & Environment**
+- API key validation and secure storage
+- File type and size restrictions
+- Error boundary implementation
+- Environment variable configuration (.env.local)
+
+This architecture provides a scalable, modular approach to document-based AI assistance with clear separation of concerns and robust error handling.
+
+
+
+================================================
+FILE: App.tsx
+================================================
+
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Document as LangchainDocument } from "langchain/document"; 
+import { FileUpload } from './components/FileUpload';
+import { ModelSelector } from './components/ModelSelector';
+import { ChatWindow } from './components/ChatWindow';
+import { DocumentList } from './components/DocumentList';
+import { Spinner } from './components/Spinner';
+import { Alert } from './components/Alert';
+import { Message, DocumentFile, ModelId } from './types';
+import { GEMINI_MODELS, DEFAULT_MODEL_ID, APP_NAME, MAX_CONTEXT_CHUNKS, CHUNK_SIZE, CHUNK_OVERLAP } from './constants';
+import { processFilesToLangchainDocs, splitLangchainDocs } from './services/documentProcessorService';
+import { queryGemini } from './services/geminiService';
+import { LogoIcon, UploadIcon, InfoIcon } from './components/Icons';
+
+const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [documentFiles, setDocumentFiles] = useState<DocumentFile[]>([]);
+  const [processedDocs, setProcessedDocs] = useState<LangchainDocument[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<ModelId>(DEFAULT_MODEL_ID);
+  const [chatMessages, setChatMessages] = useState<Message[]>([
+    {
+      id: 'initial-greeting',
+      role: 'assistant',
+      content: `Welcome to the ${APP_NAME}! Please upload your documents and then ask a question.`,
+      timestamp: new Date(),
+    }
+  ]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // More robust check for process.env.API_KEY in browser environments
+    const envApiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) 
+                      ? process.env.API_KEY 
+                      : null;
+
+    if (envApiKey) {
+      setApiKey(envApiKey);
+      if (error && error.startsWith("CRITICAL: Gemini API Key not found")) {
+        setError(null); // Clear API key specific error if key is now found
+      }
+    } else {
+      const errMsg = "CRITICAL: Gemini API Key not found. Please ensure 'API_KEY' is set in your environment variables. The application requires this key to communicate with the AI model and cannot function without it.";
+      console.error(errMsg);
+      setError(errMsg);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run this effect only once on component mount
+  
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  const handleFilesChange = useCallback(async (files: File[]) => {
+    if (!apiKey) {
+      setError("Cannot process files: Gemini API Key is not configured.");
+      return;
+    }
+    setError(null);
+    setIsLoading(true);
+    const newDocFiles: DocumentFile[] = files.map(file => ({
+      id: `${file.name}-${Date.now()}`,
+      file,
+      status: 'pending',
+    }));
+    setDocumentFiles(prev => [...prev, ...newDocFiles]);
+
+    try {
+      const { allLangchainDocs, updatedDocFiles } = await processFilesToLangchainDocs(newDocFiles);
+      setDocumentFiles(prev => prev.map(df => {
+        const updated = updatedDocFiles.find(udf => udf.id === df.id);
+        return updated || df;
+      })); 
+      
+      if (allLangchainDocs.length > 0) {
+        const chunks = await splitLangchainDocs(allLangchainDocs, CHUNK_SIZE, CHUNK_OVERLAP);
+        setProcessedDocs(prevChunks => [...prevChunks, ...chunks]);
+        setError(null); 
+      }
+    } catch (e) {
+      console.error("Error processing documents:", e);
+      setError(`Error processing documents: ${e instanceof Error ? e.message : String(e)}`);
+      setDocumentFiles(prev => prev.map(df => 
+        newDocFiles.find(ndf => ndf.id === df.id) ? {...df, status: 'error', errorMessage: String(e)} : df
+      ));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiKey]);
+
+  const handleSendMessage = useCallback(async (userInput: string) => {
+    if (!userInput.trim()) return;
+    if (!apiKey) {
+      setError("Gemini API Key is not configured. Cannot process your request.");
+      setChatMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: "I can't respond right now as the Gemini API Key is not configured.", timestamp: new Date() }]);
+      return;
+    }
+    if(processedDocs.length === 0) {
+        setError("Please upload and process some documents before asking questions.");
+         setChatMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: "I need some documents to read first. Please upload them using the panel on the left.", timestamp: new Date() }]);
+        return;
+    }
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: userInput,
+      timestamp: new Date(),
+    };
+    setChatMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const contextDocs: LangchainDocument[] = processedDocs.slice(-MAX_CONTEXT_CHUNKS); 
+      const modelConfig = GEMINI_MODELS.find(m => m.id === selectedModelId) || GEMINI_MODELS[0];
+      const history = chatMessages.filter(m => m.id !== 'initial-greeting' && m.id !== 'initial-greeting-cleared').slice(-10); 
+
+      const responseText = await queryGemini(
+        apiKey,
+        modelConfig,
+        userInput,
+        contextDocs,
+        history
+      );
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: responseText,
+        sources: contextDocs, 
+        timestamp: new Date(),
+      };
+      setChatMessages(prev => [...prev, assistantMessage]);
+    } catch (e) {
+      console.error("Error querying Gemini:", e);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      setError(`Error from AI: ${errorMsg}`);
+      setChatMessages(prev => [...prev, {id: (Date.now() + 1).toString(), role: 'assistant', content: `Sorry, I encountered an error: ${errorMsg}`, timestamp: new Date()}]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiKey, selectedModelId, processedDocs, chatMessages]);
+  
+  const handleClearChat = () => {
+    setChatMessages([
+      { 
+        id: 'initial-greeting-cleared',
+        role: 'assistant',
+        content: 'Chat cleared. Upload documents and ask a new question.',
+        timestamp: new Date(),
+      }
+    ]);
+    setError(null);
+  };
+
+  const handleRemoveDocument = (docIdToRemove: string) => {
+    setDocumentFiles(prevDocFiles => prevDocFiles.filter(df => df.id !== docIdToRemove));
+    setProcessedDocs(prevProcessedDocs => prevProcessedDocs.filter(ld => ld.metadata?.source !== documentFiles.find(df => df.id === docIdToRemove)?.file.name));
+    setError(null);
+  };
+
+  // If API key is missing and error is set, show only the error.
+  if (!apiKey && error) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-secondary-100 p-4">
+        <Alert message={error} type="error" />
+      </div>
+    );
+  }
+
+  // If API key is still null (initial check ongoing) and no critical error yet, show loading.
+  if (apiKey === null && !error) {
+     return (
+      <div className="flex h-screen items-center justify-center bg-secondary-100 p-4 text-secondary-700">
+        <Spinner /> 
+        <span className="ml-3 text-lg">Initializing and checking API Key...</span>
+      </div>
+    );
+  }
+  
+  // If API key is null but an error IS set (e.g. the critical API key error), the above block will catch it.
+  // This means if we reach here, apiKey should ideally be set OR an error related to it is already shown.
+
+  return (
+    <div className="flex h-screen font-sans bg-secondary-100 text-secondary-900">
+      <aside className="w-1/3 lg:w-1/4 bg-secondary-50 p-4 md:p-6 shadow-lg flex flex-col space-y-4 md:space-y-6 overflow-y-auto">
+        <div className="flex items-center space-x-2 text-primary-600">
+          <LogoIcon className="h-8 w-8 md:h-10 md:w-10" />
+          <h1 className="text-xl md:text-2xl font-bold">{APP_NAME}</h1>
+        </div>
+
+        <div className="flex-grow flex flex-col space-y-4 md:space-y-6">
+          <div>
+            <h2 className="text-md md:text-lg font-semibold mb-2 text-primary-700">Upload Documents</h2>
+            <FileUpload onFilesChange={handleFilesChange} />
+            <p className="text-xs text-secondary-500 mt-1">Supports: TXT, PDF, DOCX. Max 5 files, 10MB each.</p>
+          </div>
+
+          <DocumentList documents={documentFiles} onRemoveDocument={handleRemoveDocument} />
+
+          <div>
+            <h2 className="text-md md:text-lg font-semibold mb-2 text-primary-700">Select Model</h2>
+            <ModelSelector
+              models={GEMINI_MODELS}
+              selectedModelId={selectedModelId}
+              onModelChange={setSelectedModelId}
+            />
+          </div>
+        </div>
+        
+        <div className="mt-auto p-3 bg-primary-50 rounded-lg shadow">
+            <div className="flex items-start space-x-2 text-sm text-primary-700">
+                <InfoIcon className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                <p>This app uses uploaded documents as context. Text extraction for PDF/DOCX is client-side. Ensure <code>API_KEY</code> is available in <code>process.env</code>.</p>
+            </div>
+        </div>
+      </aside>
+
+      <main className="flex-1 flex flex-col p-4 md:p-6">
+        {error && <Alert message={error} type="error" onClose={() => setError(null)} />}
+        {isLoading && !error && ( /* Only show spinner if no general error is displayed */
+          <div className="absolute top-4 right-4 md:top-6 md:right-6 z-50">
+            <Spinner />
+          </div>
+        )}
+        <ChatWindow
+          messages={chatMessages}
+          isLoading={isLoading}
+          onSendMessage={handleSendMessage}
+          onClearChat={handleClearChat}
+          chatContainerRef={chatContainerRef}
+        />
+      </main>
+    </div>
+  );
+};
+
+export default App;
+
+
+================================================
+FILE: constants.ts
+================================================
+
+import { ModelConfig, ModelId } from './types';
+
+export const APP_NAME = "Agentic RAG Assistant";
+
+export const SUPPORTED_FILE_TYPES = ['text/plain', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+export const MAX_FILE_SIZE_MB = 10; // 10 MB
+export const MAX_FILES_UPLOAD = 5;
+
+export const GEMINI_MODELS: ModelConfig[] = [
+  {
+    id: ModelId.GEMINI_FLASH,
+    name: 'Gemini 2.5 Flash (Preview)',
+    type: 'gemini',
+    temperature: 0.7,
+    maxOutputTokens: 2048,
+  },
+];
+
+export const DEFAULT_MODEL_ID = ModelId.GEMINI_FLASH;
+
+export const CHUNK_SIZE = 1000;
+export const CHUNK_OVERLAP = 200;
+export const MAX_CONTEXT_CHUNKS = 5; // Max chunks to send to LLM to avoid overly long prompts
+
+export const SYSTEM_PROMPT_TEMPLATE = `You are an expert AI assistant. Your task is to answer the user's question based *ONLY* on the provided document excerpts.
+Be concise and factual.
+If the answer is not found within the provided documents, clearly state that you cannot answer based on the given information.
+Do not make up information or use external knowledge.
+Chat History (for context):
+{chat_history}
+
+Provided Document Excerpts:
+---
+{document_context}
+---
+`;
+
+
+
+================================================
+FILE: index.html
+================================================
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agentic RAG with Langchain and Gemini</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: {"50":"#eff6ff","100":"#dbeafe","200":"#bfdbfe","300":"#93c5fd","400":"#60a5fa","500":"#3b82f6","600":"#2563eb","700":"#1d4ed8","800":"#1e40af","900":"#1e3a8a","950":"#172554"},
+              secondary: {"50":"#f8fafc","100":"#f1f5f9","200":"#e2e8f0","300":"#cbd5e1","400":"#94a3b8","500":"#64748b","600":"#475569","700":"#334155","800":"#1e293b","900":"#0f172a","950":"#020617"}
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "langchain/": "https://esm.sh/langchain@^0.3.27/",
+    "react-dropzone": "https://esm.sh/react-dropzone@^14.3.8",
+    "@google/genai": "https://esm.sh/@google/genai@^1.4.0",
+    "@langchain/community/": "https://esm.sh/@langchain/community@^0.3.45/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root">Loading Application Shell...</div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
+
+
+================================================
+FILE: index.tsx
+================================================
+
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error("Could not find root element to mount to");
+}
+
+const root = ReactDOM.createRoot(rootElement);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+
+
+================================================
+FILE: metadata.json
+================================================
+{
+  "name": "Agentic RAG with Langchain and Gemini",
+  "description": "A React web application that allows users to upload documents and ask questions about their content, leveraging Langchain.js for document processing and Google Gemini API for question answering in a Retrieval Augmented Generation (RAG) style.",
+  "requestFramePermissions": []
+}
+
+
+================================================
+FILE: package.json
+================================================
+{
+  "name": "agentic-rag-with-langchain-and-gemini",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "vite preview"
+  },
+  "dependencies": {
+    "@google/genai": "^1.4.0",
+    "@langchain/community": "^0.3.45",
+    "langchain": "^0.3.27",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-dropzone": "^14.3.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0"
+  }
+}
+
+
+
+================================================
+FILE: tool_call.json
+================================================
+{
+  "tool": "brave_local_search",
+  "parameters": {
+    "query": "psychiatry in Jakarta",
+    "count": 10
+  }
+}
+
+
+================================================
+FILE: tsconfig.json
+================================================
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "allowJs": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+
+    "paths": {
+      "@/*" :  ["./*"]
+    }
+  }
+}
+
+
+
+================================================
+FILE: types.ts
+================================================
+
+import { Document } from "langchain/document";
+
+export interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  sources?: Document[]; 
+}
+
+export interface DocumentFile {
+  file: File;
+  id: string;
+  status: 'pending' | 'processing' | 'processed' | 'error';
+  errorMessage?: string;
+  langchainDocs?: Document[];
+}
+
+export enum ModelId {
+  GEMINI_FLASH = 'gemini-2.5-flash-preview-04-17',
+  // Add other models if needed, e.g., for OpenAI if we were to implement it
+}
+
+export interface ModelConfig {
+  id: ModelId;
+  name: string;
+  type: 'gemini'; // Could be 'openai' in a more general app
+  maxOutputTokens?: number;
+  temperature?: number;
+}
+
+
+
+================================================
+FILE: vite.config.ts
+================================================
+import path from 'path';
+import { defineConfig, loadEnv } from 'vite';
+
+export default defineConfig(({ mode }) => {
+    const env = loadEnv(mode, '.', '');
+    return {
+      define: {
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+      },
+      resolve: {
+        alias: {
+          '@': path.resolve(__dirname, '.'),
+        }
+      }
+    };
+});
+
+
+
+================================================
+FILE: components/Alert.tsx
+================================================
+
+import React from 'react';
+import { ExclamationCircleIcon, InfoIcon, XCircleIcon, CheckCircleIcon } from './Icons';
+
+interface AlertProps {
+  message: string;
+  type: 'error' | 'info' | 'success';
+  onClose?: () => void;
+}
+
+export const Alert: React.FC<AlertProps> = ({ message, type, onClose }) => {
+  const baseClasses = "p-4 mb-4 rounded-lg shadow-md flex items-start";
+  let typeClasses = "";
+  let IconComponent;
+
+  switch (type) {
+    case 'error':
+      typeClasses = "bg-red-100 border border-red-300 text-red-700";
+      IconComponent = <ExclamationCircleIcon className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />;
+      break;
+    case 'info':
+      typeClasses = "bg-blue-100 border border-blue-300 text-blue-700";
+      IconComponent = <InfoIcon className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />;
+      break;
+    case 'success':
+      typeClasses = "bg-green-100 border border-green-300 text-green-700";
+      IconComponent = <CheckCircleIcon className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />;
+      break;
+    default:
+      typeClasses = "bg-secondary-100 border border-secondary-300 text-secondary-700";
+      IconComponent = <InfoIcon className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />;
+  }
+
+  return (
+    <div className={`${baseClasses} ${typeClasses}`} role="alert">
+      {IconComponent}
+      <div className="flex-grow text-sm">{message}</div>
+      {onClose && (
+        <button onClick={onClose} className="ml-4 -mt-1 -mr-1 p-1 rounded-md hover:bg-opacity-20" aria-label="Close alert">
+           <XCircleIcon className={`h-5 w-5 ${type === 'error' ? 'text-red-500 hover:text-red-700' : type === 'info' ? 'text-blue-500 hover:text-blue-700' : 'text-green-500 hover:text-green-700'}`}/>
+        </button>
+      )}
+    </div>
+  );
+};
+
+
+
+================================================
+FILE: components/ChatHistory.tsx
+================================================
+
+import React from 'react';
+import { Message } from '../types';
+import { ChatMessage } from './ChatMessage';
+
+interface ChatHistoryProps {
+  messages: Message[];
+  chatContainerRef: React.RefObject<HTMLDivElement>;
+}
+
+export const ChatHistory: React.FC<ChatHistoryProps> = ({ messages, chatContainerRef }) => {
+  return (
+    <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-6 space-y-4 bg-secondary-50">
+      {messages.length === 0 && (
+        <div className="flex flex-col items-center justify-center h-full text-secondary-500">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mb-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-3.86 8.25-8.625 8.25S3.75 16.556 3.75 12s3.86-8.25 8.625-8.25S21 7.444 21 12z" />
+          </svg>
+          <p className="text-lg">No messages yet.</p>
+          <p className="text-sm">Upload documents and ask a question to start the conversation.</p>
+        </div>
+      )}
+      {messages.map((msg) => (
+        <ChatMessage key={msg.id} message={msg} />
+      ))}
+    </div>
+  );
+};
+
+
+
+================================================
+FILE: components/ChatInput.tsx
+================================================
+
+import React, { useState } from 'react';
+import { SendIcon, TrashIcon } from './Icons';
+
+interface ChatInputProps {
+  onSendMessage: (message: string) => void;
+  isLoading: boolean;
+  onClearChat: () => void;
+}
+
+export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, onClearChat }) => {
+  const [input, setInput] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (input.trim() && !isLoading) {
+      onSendMessage(input);
+      setInput('');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-4 border-t border-secondary-200 bg-white">
+      <div className="flex items-center space-x-3">
+        <button
+          type="button"
+          onClick={onClearChat}
+          disabled={isLoading}
+          className="p-2 text-secondary-500 hover:text-red-500 disabled:opacity-50 transition-colors rounded-full hover:bg-secondary-100"
+          aria-label="Clear chat history"
+        >
+          <TrashIcon className="w-6 h-6" />
+        </button>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask about your documents..."
+          disabled={isLoading}
+          className="flex-1 px-4 py-3 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow"
+        />
+        <button
+          type="submit"
+          disabled={isLoading || !input.trim()}
+          className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 transition-colors flex items-center justify-center"
+          aria-label="Send message"
+        >
+          {isLoading ? (
+            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : (
+            <SendIcon className="w-5 h-5" />
+          )}
+        </button>
+      </div>
+    </form>
+  );
+};
+
+
+
+================================================
+FILE: components/ChatMessage.tsx
+================================================
+
+import React from 'react';
+import { Message } from '../types';
+import { UserIcon, AssistantIcon, DocumentTextIcon } from './Icons'; // Assuming you have these SVG icons
+
+export const ChatMessage: React.FC<{ message: Message }> = ({ message }) => {
+  const isUser = message.role === 'user';
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-xl lg:max-w-2xl flex items-start space-x-3`}>
+        {!isUser && (
+          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-primary-500 flex items-center justify-center text-white">
+            <AssistantIcon className="h-6 w-6" />
+          </div>
+        )}
+        <div
+          className={`p-4 rounded-xl shadow-md
+            ${isUser ? 'bg-primary-500 text-white rounded-br-none' : 'bg-secondary-200 text-secondary-800 rounded-bl-none'}`}
+        >
+          <p className="whitespace-pre-wrap text-sm md:text-base">{message.content}</p>
+          {!isUser && message.sources && message.sources.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-secondary-300">
+              <h4 className="text-xs font-semibold text-secondary-600 mb-1">Sources:</h4>
+              <ul className="space-y-1">
+                {message.sources.map((doc, index) => (
+                  <li key={index} className="text-xs text-secondary-500 flex items-center">
+                    <DocumentTextIcon className="h-3 w-3 mr-1 flex-shrink-0" />
+                    <span>{doc.metadata?.source || `Source ${index + 1}`} (Excerpt)</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+         {isUser && (
+          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-secondary-700 flex items-center justify-center text-white">
+            <UserIcon className="h-6 w-6" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+
+================================================
+FILE: components/ChatWindow.tsx
+================================================
+
+import React from 'react';
+import { Message } from '../types';
+import { ChatHistory } from './ChatHistory';
+import { ChatInput } from './ChatInput';
+
+interface ChatWindowProps {
+  messages: Message[];
+  isLoading: boolean;
+  onSendMessage: (message: string) => void;
+  onClearChat: () => void;
+  chatContainerRef: React.RefObject<HTMLDivElement>;
+}
+
+export const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, onSendMessage, onClearChat, chatContainerRef }) => {
+  return (
+    <div className="flex flex-col h-full bg-white shadow-xl rounded-lg overflow-hidden">
+      <ChatHistory messages={messages} chatContainerRef={chatContainerRef} />
+      <ChatInput onSendMessage={onSendMessage} isLoading={isLoading} onClearChat={onClearChat} />
+    </div>
+  );
+};
+
+
+
+================================================
+FILE: components/DocumentList.tsx
+================================================
+
+import React from 'react';
+import { DocumentFile } from '../types';
+import { DocumentTextIcon, CheckCircleIcon, ExclamationCircleIcon, XCircleIcon, DocumentProcessingIcon } from './Icons';
+
+interface DocumentListProps {
+  documents: DocumentFile[];
+  onRemoveDocument: (docId: string) => void;
+}
+
+const StatusIcon: React.FC<{ status: DocumentFile['status'] }> = ({ status }) => {
+  switch (status) {
+    case 'pending':
+      return <DocumentProcessingIcon className="w-4 h-4 text-secondary-400 animate-pulse" />;
+    case 'processing':
+      return <DocumentProcessingIcon className="w-4 h-4 text-primary-500 animate-spin" />;
+    case 'processed':
+      return <CheckCircleIcon className="w-4 h-4 text-green-500" />;
+    case 'error':
+      return <ExclamationCircleIcon className="w-4 h-4 text-red-500" />;
+    default:
+      return null;
+  }
+};
+
+
+export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRemoveDocument }) => {
+  if (documents.length === 0) {
+    return (
+      <div className="p-4 text-center text-secondary-500 bg-secondary-100 rounded-lg">
+        <DocumentTextIcon className="w-8 h-8 mx-auto mb-2 text-secondary-400" />
+        No documents uploaded yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-md font-semibold text-primary-700 mb-1">Uploaded Documents:</h3>
+      <ul className="max-h-60 overflow-y-auto space-y-2 pr-1">
+        {documents.map((docFile) => (
+          <li
+            key={docFile.id}
+            className="flex items-center justify-between p-2.5 bg-white rounded-lg shadow-sm border border-secondary-200 hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-center space-x-2 overflow-hidden">
+              <DocumentTextIcon className="w-5 h-5 text-primary-500 flex-shrink-0" />
+              <span className="text-sm text-secondary-700 truncate" title={docFile.file.name}>
+                {docFile.file.name}
+              </span>
+              <StatusIcon status={docFile.status} />
+            </div>
+            <button
+              onClick={() => onRemoveDocument(docFile.id)}
+              className="p-1 text-secondary-400 hover:text-red-600 rounded-full hover:bg-red-100 transition-colors"
+              aria-label={`Remove ${docFile.file.name}`}
+            >
+              <XCircleIcon className="w-5 h-5" />
+            </button>
+          </li>
+        ))}
+        {documents.some(d => d.status === 'error') && (
+            <p className="text-xs text-red-500 mt-1">Some documents failed to process. Check console for details.</p>
+        )}
+      </ul>
+    </div>
+  );
+};
+
+
+
+================================================
+FILE: components/FileUpload.tsx
+================================================
+
+import React, { useCallback, useState } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE_MB, MAX_FILES_UPLOAD } from '../constants';
+import { UploadIcon } from './Icons';
+
+interface FileUploadProps {
+  onFilesChange: (files: File[]) => void;
+}
+
+export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange }) => {
+  const [fileErrors, setFileErrors] = useState<string[]>([]);
+
+  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
+    setFileErrors([]);
+    let currentErrors: string[] = [];
+
+    if (rejectedFiles.length > 0) {
+      rejectedFiles.forEach((rejectedFile: any) => {
+        rejectedFile.errors.forEach((error: any) => {
+          currentErrors.push(`${rejectedFile.file.name}: ${error.message}`);
+        });
+      });
+    }
+    
+    if (acceptedFiles.length > MAX_FILES_UPLOAD) {
+        currentErrors.push(`Too many files. Maximum ${MAX_FILES_UPLOAD} files allowed.`);
+        acceptedFiles = acceptedFiles.slice(0, MAX_FILES_UPLOAD);
+    }
+
+    if (currentErrors.length > 0) {
+      setFileErrors(currentErrors);
+    }
+    
+    if(acceptedFiles.length > 0) {
+        onFilesChange(acceptedFiles);
+    }
+
+  }, [onFilesChange]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: SUPPORTED_FILE_TYPES.reduce((acc, type) => ({ ...acc, [type]: [] }), {}),
+    maxSize: MAX_FILE_SIZE_MB * 1024 * 1024,
+    multiple: true,
+  });
+
+  return (
+    <div className="flex flex-col items-center">
+      <div
+        {...getRootProps()}
+        className={`w-full p-6 border-2 border-dashed rounded-lg cursor-pointer transition-colors
+                    ${isDragActive ? 'border-primary-500 bg-primary-50' : 'border-secondary-300 hover:border-primary-400'}`}
+      >
+        <input {...getInputProps()} />
+        <div className="flex flex-col items-center justify-center text-center">
+          <UploadIcon className="w-12 h-12 text-secondary-400 mb-2" />
+          {isDragActive ? (
+            <p className="text-primary-600 font-semibold">Drop files here...</p>
+          ) : (
+            <p className="text-secondary-600">
+              Drag & drop files here, or <span className="font-semibold text-primary-600">click to select</span>
+            </p>
+          )}
+        </div>
+      </div>
+      {fileErrors.length > 0 && (
+        <div className="mt-2 text-red-500 text-sm">
+          {fileErrors.map((err, idx) => <p key={idx}>{err}</p>)}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+
+================================================
+FILE: components/Icons.tsx
+================================================
+
+import React from 'react';
+
+export const UploadIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l-3.75 3.75M12 9.75l3.75 3.75M3 17.25V6.75A2.25 2.25 0 015.25 4.5h13.5A2.25 2.25 0 0121 6.75v10.5A2.25 2.25 0 0118.75 19.5H5.25A2.25 2.25 0 013 17.25z" />
+  </svg>
+);
+
+export const ChevronDownIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className || "w-5 h-5"}>
+    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.23 8.29a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+  </svg>
+);
+
+export const SendIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+  </svg>
+);
+
+export const TrashIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12.56 0c1.153 0 2.24.03 3.22.077m3.22-.077L10.875 5.79m2.303 0h2.304m0 0v-0.75c0-.621-.504-1.125-1.125-1.125H9.125c-.621 0-1.125.504-1.125 1.125v.75m0 0h2.304" />
+    </svg>
+);
+
+
+export const DocumentTextIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+  </svg>
+);
+
+export const CheckCircleIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+export const ExclamationCircleIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+  </svg>
+);
+
+export const XCircleIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
+export const DocumentProcessingIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3" />
+    </svg>
+);
+
+export const LogoIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-8 h-8"}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+    </svg>
+);
+
+export const InfoIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+  </svg>
+);
+
+export const UserIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+    </svg>
+);
+
+export const AssistantIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.567L16.5 21.75l-.398-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.398a2.25 2.25 0 001.423-1.423l.398-1.183L16.898 20.567z" />
+    </svg>
+);
+
+
+
+
+================================================
+FILE: components/ModelSelector.tsx
+================================================
+
+import React from 'react';
+import { ModelConfig, ModelId } from '../types';
+import { ChevronDownIcon } from './Icons';
+
+interface ModelSelectorProps {
+  models: ModelConfig[];
+  selectedModelId: ModelId;
+  onModelChange: (modelId: ModelId) => void;
+}
+
+export const ModelSelector: React.FC<ModelSelectorProps> = ({ models, selectedModelId, onModelChange }) => {
+  return (
+    <div className="relative w-full">
+      <select
+        value={selectedModelId}
+        onChange={(e) => onModelChange(e.target.value as ModelId)}
+        className="w-full appearance-none bg-white border border-secondary-300 text-secondary-700 py-3 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+      >
+        {models.map((model) => (
+          <option key={model.id} value={model.id}>
+            {model.name}
+          </option>
+        ))}
+      </select>
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-secondary-700">
+        <ChevronDownIcon className="fill-current h-4 w-4" />
+      </div>
+    </div>
+  );
+};
+
+
+
+================================================
+FILE: components/Spinner.tsx
+================================================
+
+import React from 'react';
+
+export const Spinner: React.FC = () => {
+  return (
+    <div className="flex items-center justify-center p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg">
+      <svg className="animate-spin h-6 w-6 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <span className="ml-2 text-sm text-primary-700 font-medium">Processing...</span>
+    </div>
+  );
+};
+
+
+
+================================================
+FILE: services/documentProcessorService.ts
+================================================
+
+import { Document } from "langchain/document";
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
+import { WebPDFLoader } from "@langchain/community/document_loaders/web/pdf";
+import { DocxLoader } from "@langchain/community/document_loaders/fs/docx";
+
+import { DocumentFile } from '../types';
+
+// Helper function to load and parse a single file
+async function loadAndParseFile(file: File): Promise<Document[]> {
+  const blob = new Blob([file], { type: file.type });
+  let loader;
+
+  if (file.type === 'application/pdf') {
+    loader = new WebPDFLoader(blob);
+  } else if (file.type === 'text/plain') {
+    // Handle text files manually since TextLoader may not be available
+    const text = await file.text();
+    return [new Document({ 
+      pageContent: text, 
+      metadata: { source: file.name } 
+    })];
+  } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    loader = new DocxLoader(blob);
+  } else {
+    console.warn(`Unsupported file type: ${file.type} for file ${file.name}. Skipping.`);
+    return []; // Skip unsupported file types
+  }
+  
+  try {
+    const docs = await loader.load();
+    // Add source metadata
+    return docs.map((doc: any) => new Document({ 
+        pageContent: doc.pageContent, 
+        metadata: { ...doc.metadata, source: file.name } 
+    }));
+  } catch (e) {
+    console.error(`Error loading file ${file.name}:`, e);
+    throw new Error(`Failed to load ${file.name}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+
+export async function processFilesToLangchainDocs(docFiles: DocumentFile[]): Promise<{ allLangchainDocs: Document[], updatedDocFiles: DocumentFile[] }> {
+  const allLangchainDocs: Document[] = [];
+  const updatedDocFiles = [...docFiles];
+
+  for (let i = 0; i < updatedDocFiles.length; i++) {
+    const docFile = updatedDocFiles[i];
+    if (docFile.status === 'processed') { // Already processed
+        if(docFile.langchainDocs) allLangchainDocs.push(...docFile.langchainDocs);
+        continue;
+    }
+
+    updatedDocFiles[i] = { ...docFile, status: 'processing' };
+    try {
+      const docs = await loadAndParseFile(docFile.file);
+      if (docs.length > 0) {
+        allLangchainDocs.push(...docs);
+        updatedDocFiles[i] = { ...docFile, status: 'processed', langchainDocs: docs, errorMessage: undefined };
+      } else {
+         updatedDocFiles[i] = { ...docFile, status: 'error', errorMessage: 'No content extracted or unsupported file.' };
+      }
+    } catch (e) {
+      console.error(`Error processing ${docFile.file.name}:`, e);
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      updatedDocFiles[i] = { ...docFile, status: 'error', errorMessage };
+    }
+  }
+  return { allLangchainDocs, updatedDocFiles };
+}
+
+
+export async function splitLangchainDocs(docs: Document[], chunkSize: number, chunkOverlap: number): Promise<Document[]> {
+  if (!docs || docs.length === 0) return [];
+  
+  const textSplitter = new RecursiveCharacterTextSplitter({
+    chunkSize,
+    chunkOverlap,
+  });
+
+  try {
+    const chunks = await textSplitter.splitDocuments(docs);
+    return chunks;
+  } catch (e) {
+    console.error("Error splitting documents:", e);
+    throw new Error(`Failed to split documents: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+
+
+================================================
+FILE: services/geminiService.ts
+================================================
+
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { Document } from "langchain/document";
+import { ModelConfig, Message as ChatMessage } from '../types'; // Renamed Message to avoid conflict
+import { SYSTEM_PROMPT_TEMPLATE } from '../constants';
+
+function formatChatHistory(messages: ChatMessage[]): string {
+  return messages.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n');
+}
+
+function formatDocumentContext(docs: Document[]): string {
+  if (!docs || docs.length === 0) return "No documents provided.";
+  return docs.map((doc, index) => `Excerpt ${index + 1} (from ${doc.metadata?.source || 'unknown source'}):\n${doc.pageContent}`).join("\n\n---\n\n");
+}
+
+export async function queryGemini(
+  apiKey: string,
+  modelConfig: ModelConfig,
+  userInput: string,
+  documentChunks: Document[],
+  chatHistory: ChatMessage[]
+): Promise<string> {
+  if (!apiKey) {
+    throw new Error("Gemini API Key is not provided.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const formattedHistory = formatChatHistory(chatHistory);
+  const formattedDocs = formatDocumentContext(documentChunks);
+  
+  const systemInstruction = SYSTEM_PROMPT_TEMPLATE
+    .replace('{chat_history}', formattedHistory || "No previous conversation.")
+    .replace('{document_context}', formattedDocs);
+
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: modelConfig.id,
+      contents: userInput,
+      config: {
+        systemInstruction: systemInstruction,
+        temperature: modelConfig.temperature,
+        maxOutputTokens: modelConfig.maxOutputTokens,
+      }
+    });
+    
+    const text = response.text;
+    if (text) {
+      return text;
+    } else {
+      // Attempt to get text from candidates if direct text is missing (though .text should usually work)
+      const candidateText = response.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (candidateText) {
+        return candidateText;
+      }
+      throw new Error("No text content in Gemini response.");
+    }
+
+  } catch (error) {
+    console.error("Error calling Gemini API:", error);
+    if (error instanceof Error) {
+        // Check for specific Gemini API error structures if available, otherwise rethrow generic
+        const geminiError = error as any; // Cast to any to check for specific properties
+        if (geminiError.message) {
+             // Basic check for common API key issues or permission problems based on typical error messages.
+            if (geminiError.message.toLowerCase().includes("api key not valid")) {
+                throw new Error("Gemini API Key is not valid. Please check your API key.");
+            }
+            if (geminiError.message.toLowerCase().includes("permission denied")) {
+                 throw new Error("Permission denied by Gemini API. This could be due to API key restrictions or billing issues.");
+            }
+            throw new Error(`Gemini API Error: ${geminiError.message}`);
+        }
+    }
+    throw new Error(`Failed to query Gemini: ${String(error)}`);
+  }
+}
+
+

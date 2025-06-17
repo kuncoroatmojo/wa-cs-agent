@@ -1,0 +1,411 @@
+Directory structure:
+└── thomasjanssen-tech-agentic-rag-with-langchain/
+    ├── readme.md
+    ├── agentic_rag.py
+    ├── agentic_rag_streamlit.py
+    ├── ingest_in_db.py
+    ├── LICENSE
+    ├── requirements.txt
+    ├── .env.example
+    └── documents/
+
+================================================
+FILE: readme.md
+================================================
+<h1>Agentic RAG (Retrieval Augmented Generation) with LangChain and Supabase</h1>
+
+<h2>Watch the full tutorial on my YouTube Channel</h2>
+<div>
+
+<a href="https://www.youtube.com/watch?v=3ZDeqTIXBPM">
+    <img src="thumbnail.png" alt="Thomas Janssen Youtube" width="200"/>
+</a>
+</div>
+
+<h2>Prerequisites</h2>
+<ul>
+  <li>Python 3.11+</li>
+</ul>
+
+<h2>Installation</h2>
+<h3>1. Clone the repository:</h3>
+
+```
+git clone https://github.com/ThomasJanssen-tech/Agentic-RAG-with-LangChain.git
+cd Agentic RAG with LangChain
+```
+
+<h3>2. Create a virtual environment</h3>
+
+```
+python -m venv venv
+```
+
+<h3>3. Activate the virtual environment</h3>
+
+```
+venv\Scripts\Activate
+(or on Mac): source venv/bin/activate
+```
+
+<h3>4. Install libraries</h3>
+
+```
+pip install -r requirements.txt
+```
+
+<h3>5. Create accounts</h3>
+
+- Create a free account on Supabase: https://supabase.com/
+- Create an API key for OpenAI: https://platform.openai.com/api-keys
+
+<h3>6. Execute SQL queries in Supabase</h3>
+
+Execute the following SQL query in Supabase:
+
+```
+-- Enable the pgvector extension to work with embedding vectors
+create extension if not exists vector;
+
+-- Create a table to store your documents
+create table
+  documents (
+    id uuid primary key,
+    content text, -- corresponds to Document.pageContent
+    metadata jsonb, -- corresponds to Document.metadata
+    embedding vector (1536) -- 1536 works for OpenAI embeddings, change if needed
+  );
+
+-- Create a function to search for documents
+create function match_documents (
+  query_embedding vector (1536),
+  filter jsonb default '{}'
+) returns table (
+  id uuid,
+  content text,
+  metadata jsonb,
+  similarity float
+) language plpgsql as $$
+#variable_conflict use_column
+begin
+  return query
+  select
+    id,
+    content,
+    metadata,
+    1 - (documents.embedding <=> query_embedding) as similarity
+  from documents
+  where metadata @> filter
+  order by documents.embedding <=> query_embedding;
+end;
+$$;
+```
+
+<h3>7. Add API keys to .env file</h3>
+
+- Rename .env.example to .env
+- Add the API keys for Supabase and OpenAI to the .env file
+
+<h2>Executing the scripts</h2>
+
+- Open a terminal in VS Code
+
+- Execute the following command:
+
+```
+python ingest_in_db.py
+python agentic_rag.py
+streamlit run agentic_rag_streamlit.py
+```
+
+<h2>Sources</h2>
+
+While making this video, I used the following sources:
+
+<ul>
+<li>https://python.langchain.com/docs/integrations/vectorstores/supabase/</li>
+<li>https://python.langchain.com/docs/integrations/text_embedding/openai/</li>
+<li>https://platform.openai.com/docs/guides/embeddings</li>
+<li>https://www.kaggle.com/code/youssef19/documents-splitting-with-langchain</li>
+<li>https://openai.com/index/new-embedding-models-and-api-updates/</li>
+<li>https://zilliz.com/ai-models/text-embedding-3-small</li>
+</ul>
+
+
+
+================================================
+FILE: agentic_rag.py
+================================================
+# import basics
+import os
+from dotenv import load_dotenv
+
+from langchain.agents import AgentExecutor
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.agents import create_tool_calling_agent
+from langchain_core.prompts import PromptTemplate
+from langchain_community.vectorstores import SupabaseVectorStore
+from langchain_openai import OpenAIEmbeddings
+from langchain import hub
+
+from supabase.client import Client, create_client
+from langchain_core.tools import tool
+
+# load environment variables
+load_dotenv()  
+
+# initiate supabase database
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_SERVICE_KEY")
+
+supabase: Client = create_client(supabase_url, supabase_key)
+
+# initiate embeddings model
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
+# initiate vector store
+vector_store = SupabaseVectorStore(
+    embedding=embeddings,
+    client=supabase,
+    table_name="documents",
+    query_name="match_documents",
+)
+
+# initiate large language model (temperature = 0)
+llm = ChatOpenAI(temperature=0)
+
+# fetch the prompt from the prompt hub
+prompt = hub.pull("hwchase17/openai-functions-agent")
+
+# create the tools
+@tool(response_format="content_and_artifact")
+def retrieve(query: str):
+    """Retrieve information related to a query."""
+    retrieved_docs = vector_store.similarity_search(query, k=2)
+    serialized = "\n\n".join(
+        (f"Source: {doc.metadata}\n" f"Content: {doc.page_content}")
+        for doc in retrieved_docs
+    )
+    return serialized, retrieved_docs
+
+# combine the tools and provide to the llm
+tools = [retrieve]
+agent = create_tool_calling_agent(llm, tools, prompt)
+
+# create the agent executor
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+# invoke the agent
+response = agent_executor.invoke({"input": "why is agentic rag better than naive rag?"})
+
+# put the result on the screen
+print(response["output"])
+
+
+================================================
+FILE: agentic_rag_streamlit.py
+================================================
+# import basics
+import os
+from dotenv import load_dotenv
+
+# import streamlit
+import streamlit as st
+
+# import langchain
+from langchain.agents import AgentExecutor
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.chat_models import init_chat_model
+from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
+from langchain.agents import create_tool_calling_agent
+from langchain import hub
+from langchain_core.prompts import PromptTemplate
+from langchain_community.vectorstores import SupabaseVectorStore
+from langchain_openai import OpenAIEmbeddings
+from langchain_core.tools import tool
+
+# import supabase db
+from supabase.client import Client, create_client
+
+# load environment variables
+load_dotenv()  
+
+# initiating supabase
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_SERVICE_KEY")
+supabase: Client = create_client(supabase_url, supabase_key)
+
+# initiating embeddings model
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
+# initiating vector store
+vector_store = SupabaseVectorStore(
+    embedding=embeddings,
+    client=supabase,
+    table_name="documents",
+    query_name="match_documents",
+)
+ 
+# initiating llm
+llm = ChatOpenAI(model="gpt-4o",temperature=0)
+
+# pulling prompt from hub
+prompt = hub.pull("hwchase17/openai-functions-agent")
+
+
+# creating the retriever tool
+@tool(response_format="content_and_artifact")
+def retrieve(query: str):
+    """Retrieve information related to a query."""
+    retrieved_docs = vector_store.similarity_search(query, k=2)
+    serialized = "\n\n".join(
+        (f"Source: {doc.metadata}\n" f"Content: {doc.page_content}")
+        for doc in retrieved_docs
+    )
+    return serialized, retrieved_docs
+
+# combining all tools
+tools = [retrieve]
+
+# initiating the agent
+agent = create_tool_calling_agent(llm, tools, prompt)
+
+# create the agent executor
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+# initiating streamlit app
+st.set_page_config(page_title="Agentic RAG Chatbot", page_icon="🦜")
+st.title("🦜 Agentic RAG Chatbot")
+
+# initialize chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# display chat messages from history on app rerun
+for message in st.session_state.messages:
+    if isinstance(message, HumanMessage):
+        with st.chat_message("user"):
+            st.markdown(message.content)
+    elif isinstance(message, AIMessage):
+        with st.chat_message("assistant"):
+            st.markdown(message.content)
+
+
+# create the bar where we can type messages
+user_question = st.chat_input("How are you?")
+
+
+# did the user submit a prompt?
+if user_question:
+
+    # add the message from the user (prompt) to the screen with streamlit
+    with st.chat_message("user"):
+        st.markdown(user_question)
+
+        st.session_state.messages.append(HumanMessage(user_question))
+
+
+    # invoking the agent
+    result = agent_executor.invoke({"input": user_question, "chat_history":st.session_state.messages})
+
+    ai_message = result["output"]
+
+    # adding the response from the llm to the screen (and chat)
+    with st.chat_message("assistant"):
+        st.markdown(ai_message)
+
+        st.session_state.messages.append(AIMessage(ai_message))
+
+
+
+
+================================================
+FILE: ingest_in_db.py
+================================================
+# import basics
+import os
+from dotenv import load_dotenv
+
+# import langchain
+from langchain_community.document_loaders import PyPDFDirectoryLoader
+from langchain_community.document_loaders import TextLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import SupabaseVectorStore
+from langchain_openai import OpenAIEmbeddings
+
+# import supabase
+from supabase.client import Client, create_client
+
+# load environment variables
+load_dotenv()  
+
+# initiate supabase db
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_SERVICE_KEY")
+supabase: Client = create_client(supabase_url, supabase_key)
+
+# initiate embeddings model
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
+# load pdf docs from folder 'documents'
+loader = PyPDFDirectoryLoader("documents")
+
+# split the documents in multiple chunks
+documents = loader.load()
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+docs = text_splitter.split_documents(documents)
+
+# store chunks in vector store
+vector_store = SupabaseVectorStore.from_documents(
+    docs,
+    embeddings,
+    client=supabase,
+    table_name="documents",
+    query_name="match_documents",
+    chunk_size=1000,
+)
+
+
+================================================
+FILE: LICENSE
+================================================
+MIT License
+
+Copyright (c) 2025 Thomas Janssen
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+
+================================================
+FILE: requirements.txt
+================================================
+[Non-text file]
+
+
+================================================
+FILE: .env.example
+================================================
+OPENAI_API_KEY = ""
+SUPABASE_URL = ""
+SUPABASE_SERVICE_KEY = ""
+
+

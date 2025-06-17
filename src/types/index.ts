@@ -283,4 +283,187 @@ export interface BotSchedule {
   holidays: { date: string; name: string }[];
   createdAt: string;
   updatedAt: string;
+}
+
+// Core Wacanda Types - Phase 1
+// Based on comprehensive development plan
+
+export interface Profile {
+  id: string;
+  email: string;
+  full_name?: string;
+  avatar_url?: string;
+  role: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AIConfiguration {
+  id: string;
+  user_id: string;
+  name: string;
+  provider: 'openai' | 'anthropic' | 'custom';
+  api_key: string;
+  model_name: string;
+  temperature: number;
+  max_tokens: number;
+  system_prompt?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatSession {
+  id: string;
+  user_id: string;
+  sender_id: string;
+  sender_name?: string;
+  sender_type: 'whatsapp' | 'whatwut' | 'api' | 'dashboard';
+  session_metadata: Record<string, any>;
+  last_message_at: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  messages?: ChatMessage[];
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  message_type: 'text' | 'image' | 'document' | 'audio';
+  metadata: Record<string, any>;
+  tokens_used?: number;
+  model_used?: string;
+  confidence_score?: number;
+  response_time_ms?: number;
+  created_at: string;
+  rag_context?: RAGContext;
+}
+
+export interface Document {
+  id: string;
+  user_id: string;
+  title: string;
+  content?: string;
+  file_path?: string;
+  file_type?: string;
+  file_size?: number;
+  folder_path: string;
+  upload_date: string;
+  processed_date?: string;
+  status: 'pending' | 'processing' | 'ready' | 'error';
+  error_message?: string;
+  metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebPage {
+  id: string;
+  user_id: string;
+  url: string;
+  title?: string;
+  content?: string;
+  scraped_at?: string;
+  status: 'pending' | 'scraping' | 'ready' | 'error';
+  include_children: boolean;
+  max_depth: number;
+  error_message?: string;
+  metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentEmbedding {
+  id: string;
+  user_id: string;
+  source_id: string;
+  source_type: 'document' | 'webpage';
+  chunk_text: string;
+  chunk_index: number;
+  embedding: number[];
+  metadata: Record<string, any>;
+  created_at: string;
+}
+
+export interface RAGContext {
+  id: string;
+  message_id: string;
+  source_documents: string[];
+  similarity_scores: number[];
+  context_used: string;
+  retrieval_query: string;
+  created_at: string;
+}
+
+export interface WhatsAppIntegration {
+  id: string;
+  user_id: string;
+  name: string;
+  connection_type: 'baileys' | 'cloud_api';
+  phone_number?: string;
+  instance_key: string;
+  qr_code?: string;
+  status: 'disconnected' | 'connecting' | 'connected' | 'error';
+  credentials: Record<string, any>;
+  settings: Record<string, any>;
+  last_connected_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExternalIntegration {
+  id: string;
+  user_id: string;
+  name: string;
+  integration_type: string;
+  api_key?: string;
+  webhook_url?: string;
+  settings: Record<string, any>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Additional utility types
+export interface DocumentChunk {
+  id: string;
+  content: string;
+  similarity: number;
+  source_id: string;
+  source_type: 'document' | 'webpage';
+  metadata: Record<string, any>;
+}
+
+export interface ConversationContext {
+  recentMessages: ChatMessage[];
+  summary: string;
+  topics: string[];
+  sentiment: 'positive' | 'neutral' | 'negative';
+}
+
+export interface UsageMetrics {
+  total_sessions: number;
+  total_messages: number;
+  avg_response_time: number;
+  total_tokens_used: number;
+  handoff_rate: number;
+  avg_confidence: number;
+  active_sessions: number;
+}
+
+export interface PerformanceMetrics {
+  uptime: number;
+  error_rate: number;
+  avg_database_query_time: number;
+  active_users: number;
+}
+
+export interface RAGMetrics {
+  avg_similarity_score: number;
+  documents_used: number;
+  successful_retrievals: number;
+  failed_retrievals: number;
 } 

@@ -6,6 +6,7 @@ import { useAuthStore } from './store/authStore';
 // Components
 import Layout from './components/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
+import DevelopmentMode from './components/DevelopmentMode';
 
 // Pages
 import Login from './pages/Login';
@@ -80,44 +81,45 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
-        <div className="min-h-screen bg-gray-50">
-          <Routes>
-            {/* Public Routes */}
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              }
-            />
+      <DevelopmentMode>
+        <Router>
+          <div className="min-h-screen bg-gray-50">
+            <Routes>
+              {/* Public Routes */}
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                }
+              />
 
+              {/* Protected Routes */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="instances" element={<WhatsAppInstances />} />
+                <Route path="conversations" element={<Conversations />} />
+                <Route path="documents" element={<Documents />} />
+                <Route path="rag-config" element={<RAGConfig />} />
+                <Route path="analytics" element={<Analytics />} />
+                <Route path="settings" element={<Settings />} />
+              </Route>
 
-            {/* Protected Routes */}
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="instances" element={<WhatsAppInstances />} />
-              <Route path="conversations" element={<Conversations />} />
-              <Route path="documents" element={<Documents />} />
-              <Route path="rag-config" element={<RAGConfig />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="settings" element={<Settings />} />
-            </Route>
-
-            {/* Catch all route */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </div>
-      </Router>
+              {/* Catch all route */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </div>
+        </Router>
+      </DevelopmentMode>
     </QueryClientProvider>
   );
 }
