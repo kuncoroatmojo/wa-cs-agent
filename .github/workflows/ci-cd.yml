@@ -58,14 +58,12 @@ jobs:
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
-        if: env.CODECOV_TOKEN != ''
+        if: secrets.CODECOV_TOKEN != ''
         continue-on-error: true
         with:
           file: ./coverage/lcov.info
           flags: unittests
           name: codecov-umbrella
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # Integration Tests
   integration-tests:
@@ -265,7 +263,7 @@ jobs:
       - name: Run Snyk security scan
         uses: snyk/actions/node@master
         continue-on-error: true
-        if: env.SNYK_TOKEN != ''
+        if: secrets.SNYK_TOKEN != ''
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
@@ -284,16 +282,14 @@ jobs:
   deploy-staging:
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck, unit-tests, security-scan]
-    if: github.ref == 'refs/heads/develop' && env.VERCEL_TOKEN != ''
-    env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    if: github.ref == 'refs/heads/develop' && secrets.VERCEL_TOKEN != ''
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Deploy to staging
         uses: amondnet/vercel-action@v25
-        if: env.VERCEL_TOKEN != ''
+        if: secrets.VERCEL_TOKEN != ''
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
@@ -308,16 +304,14 @@ jobs:
   deploy-production:
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck, unit-tests, security-scan]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.VERCEL_TOKEN != ''
-    env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.VERCEL_TOKEN != ''
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Deploy to production
         uses: amondnet/vercel-action@v25
-        if: env.VERCEL_TOKEN != ''
+        if: secrets.VERCEL_TOKEN != ''
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
@@ -344,13 +338,11 @@ jobs:
   notify-success:
     runs-on: ubuntu-latest
     needs: [deploy-production]
-    if: success() && github.ref == 'refs/heads/main' && env.SLACK_WEBHOOK_URL != ''
-    env:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    if: success() && github.ref == 'refs/heads/main' && secrets.SLACK_WEBHOOK_URL != ''
     steps:
       - name: Notify Slack of successful deployment
         uses: 8398a7/action-slack@v3
-        if: env.SLACK_WEBHOOK_URL != ''
+        if: secrets.SLACK_WEBHOOK_URL != ''
         with:
           status: success
           text: '🚀 Production deployment successful!'
@@ -361,13 +353,11 @@ jobs:
   notify-failure:
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck, unit-tests, integration-tests, e2e-tests, security-scan, deploy-production]
-    if: failure() && env.SLACK_WEBHOOK_URL != ''
-    env:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    if: failure() && secrets.SLACK_WEBHOOK_URL != ''
     steps:
       - name: Notify Slack of failed deployment
         uses: 8398a7/action-slack@v3
-        if: env.SLACK_WEBHOOK_URL != ''
+        if: secrets.SLACK_WEBHOOK_URL != ''
         with:
           status: failure
           text: '❌ CI/CD Pipeline failed. Please check the logs.'
@@ -378,9 +368,7 @@ jobs:
   migrate-production:
     runs-on: ubuntu-latest
     needs: [deploy-production]
-    if: success() && github.ref == 'refs/heads/main' && env.SUPABASE_ACCESS_TOKEN != ''
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    if: success() && github.ref == 'refs/heads/main' && secrets.SUPABASE_ACCESS_TOKEN != ''
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

@@ -70,13 +70,11 @@ jobs:
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
-        if: success() && env.CODECOV_TOKEN != ''
+        if: success() && secrets.CODECOV_TOKEN != ''
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
           fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # =====================================================
   # PREVIEW DEPLOYMENT (PR)
@@ -85,9 +83,7 @@ jobs:
     name: Preview Deployment
     runs-on: ubuntu-latest
     needs: [quality-checks, test]
-    if: github.event_name == 'pull_request' && env.VERCEL_TOKEN != ''
-    env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    if: github.event_name == 'pull_request' && secrets.VERCEL_TOKEN != ''
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -143,9 +139,7 @@ jobs:
     name: Production Deployment
     runs-on: ubuntu-latest
     needs: quality-checks
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.VERCEL_TOKEN != ''
-    env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.VERCEL_TOKEN != ''
     outputs:
       production_url: ${{ steps.deploy.outputs.production_url }}
       deployment_success: ${{ steps.deploy.outcome == 'success' }}
@@ -191,9 +185,7 @@ jobs:
     name: Fallback Notification
     runs-on: ubuntu-latest
     needs: quality-checks
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.VERCEL_TOKEN == ''
-    env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.VERCEL_TOKEN == ''
     steps:
       - name: Notify missing secrets
         run: |
@@ -302,9 +294,7 @@ jobs:
   rollback:
     name: Rollback Deployment
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && env.VERCEL_TOKEN != ''
-    env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    if: github.event_name == 'workflow_dispatch' && secrets.VERCEL_TOKEN != ''
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
