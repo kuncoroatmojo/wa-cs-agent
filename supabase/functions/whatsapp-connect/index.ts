@@ -29,7 +29,7 @@ serve(async (req) => {
 
     // Get the integration
     const { data: integration, error: integrationError } = await supabase
-      .from('whatsapp_integrations')
+      .from('whatsapp_instances')
       .select('*')
       .eq('id', integration_id)
       .single()
@@ -72,7 +72,7 @@ async function handleConnect(supabase: any, integration: any): Promise<Response>
   try {
     // Update status to connecting
     await supabase
-      .from('whatsapp_integrations')
+      .from('whatsapp_instances')
       .update({ status: 'connecting' })
       .eq('id', integration.id)
 
@@ -82,7 +82,7 @@ async function handleConnect(supabase: any, integration: any): Promise<Response>
       
       if (result.success) {
         await supabase
-          .from('whatsapp_integrations')
+          .from('whatsapp_instances')
           .update({
             status: 'connected',
             last_connected_at: new Date().toISOString()
@@ -90,7 +90,7 @@ async function handleConnect(supabase: any, integration: any): Promise<Response>
           .eq('id', integration.id)
       } else {
         await supabase
-          .from('whatsapp_integrations')
+          .from('whatsapp_instances')
           .update({ status: 'error' })
           .eq('id', integration.id)
       }
@@ -116,7 +116,7 @@ async function handleConnect(supabase: any, integration: any): Promise<Response>
   } catch (error) {
     // Update status to error
     await supabase
-      .from('whatsapp_integrations')
+      .from('whatsapp_instances')
       .update({ status: 'error' })
       .eq('id', integration.id)
 
@@ -132,7 +132,7 @@ async function handleDisconnect(supabase: any, integration: any): Promise<Respon
     if (integration.connection_type === 'cloud_api') {
       // For Cloud API, just update status
       await supabase
-        .from('whatsapp_integrations')
+        .from('whatsapp_instances')
         .update({
           status: 'disconnected',
           qr_code: null
@@ -178,7 +178,7 @@ async function handleStatus(supabase: any, integration: any): Promise<Response> 
     // Update status in database if changed
     if (status !== integration.status) {
       await supabase
-        .from('whatsapp_integrations')
+        .from('whatsapp_instances')
         .update({ status })
         .eq('id', integration.id)
     }
@@ -243,7 +243,7 @@ async function connectBaileys(supabase: any, integration: any): Promise<{ succes
     
     // Update the QR code in the database
     await supabase
-      .from('whatsapp_integrations')
+      .from('whatsapp_instances')
       .update({
         qr_code: qrCode,
         status: 'connecting'
@@ -270,7 +270,7 @@ async function connectBaileys(supabase: any, integration: any): Promise<{ succes
 async function disconnectBaileys(supabase: any, integration: any) {
   // Clean up Baileys session
   await supabase
-    .from('whatsapp_integrations')
+    .from('whatsapp_instances')
     .update({
       status: 'disconnected',
       qr_code: null

@@ -69,7 +69,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
         connectionType: item.connection_type,
         phoneNumber: item.phone_number,
         qrCode: item.qr_code,
-        lastSeen: item.last_seen,
+        lastSeen: item.last_connected_at,
         userId: item.user_id,
         settings: item.settings,
         createdAt: item.created_at,
@@ -95,6 +95,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
           name: data.name || '',
           connection_type: data.connectionType || 'baileys',
           user_id: data.userId || '',
+          instance_key: `instance_${Date.now()}`,
           settings: data.settings || {
             autoReply: true,
             businessHours: {
@@ -270,19 +271,21 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
   subscribeToInstances: () => {
     const subscription = supabase
       .channel('whatsapp_instances')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'whatsapp_instances'
-      }, () => {
-        // Refresh instances when changes occur
-        get().fetchInstances();
-      })
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'whatsapp_instances'
+        },
+        () => {
+          // Refresh instances when changes occur
+          get().fetchInstances();
+        }
+      )
       .subscribe();
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => supabase.removeChannel(subscription);
   },
 
   subscribeToConversations: () => {

@@ -226,7 +226,17 @@ class EvolutionApiClient {
       updatedAt: new Date().toISOString(),
     };
 
-    await supabase.from('whatsapp_instances').upsert(instance);
+    await supabase.from('whatsapp_instances').upsert({
+      name: instance.name,
+      user_id: userId,
+      connection_type: instance.connectionType,
+      phone_number: instance.phoneNumber,
+      status: instance.status,
+      qr_code: instance.qrCode,
+      instance_key: instanceData.instanceName || `instance_${Date.now()}`,
+      created_at: instance.createdAt,
+      updated_at: instance.updatedAt,
+    });
   }
 
   async syncMessageToDatabase(messageData: any, instanceId: string): Promise<void> {

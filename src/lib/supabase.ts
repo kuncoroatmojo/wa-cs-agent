@@ -102,9 +102,11 @@ export interface Database {
           status: 'connected' | 'disconnected' | 'connecting' | 'error';
           connection_type: 'baileys' | 'cloud_api';
           phone_number?: string;
+          instance_key: string;
           qr_code?: string;
-          last_seen?: string;
+          last_connected_at?: string;
           user_id: string;
+          credentials: any;
           settings: any;
           created_at: string;
           updated_at: string;
@@ -115,9 +117,11 @@ export interface Database {
           status?: 'connected' | 'disconnected' | 'connecting' | 'error';
           connection_type: 'baileys' | 'cloud_api';
           phone_number?: string;
+          instance_key: string;
           qr_code?: string;
-          last_seen?: string;
+          last_connected_at?: string;
           user_id: string;
+          credentials?: any;
           settings?: any;
           created_at?: string;
           updated_at?: string;
@@ -129,7 +133,8 @@ export interface Database {
           connection_type?: 'baileys' | 'cloud_api';
           phone_number?: string;
           qr_code?: string;
-          last_seen?: string;
+          last_connected_at?: string;
+          credentials?: any;
           settings?: any;
           updated_at?: string;
         };
