@@ -300,6 +300,11 @@ export class IntegrationService {
    */
   async createMessagingProvider(integration: WhatsAppIntegration | ExternalIntegration) {
     try {
+      // Add type checking to prevent the 'in' operator error
+      if (!integration || typeof integration !== 'object') {
+        throw new Error(`Invalid integration parameter: expected object, got ${typeof integration}`);
+      }
+
       // Handle different integration types
       const integrationData = 'integration_type' in integration 
         ? {
