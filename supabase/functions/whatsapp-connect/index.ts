@@ -4,6 +4,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
+  'Access-Control-Max-Age': '86400',
 }
 
 interface WhatsAppConnectRequest {
@@ -14,7 +16,10 @@ interface WhatsAppConnectRequest {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { 
+      headers: corsHeaders,
+      status: 200
+    })
   }
 
   try {
@@ -23,7 +28,41 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { integration_id, action = 'connect' }: WhatsAppConnectRequest = await req.json()
+    // Validate request method
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        { 
+          status: 405, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      )
+    }
+
+    let requestData: WhatsAppConnectRequest
+    try {
+      requestData = await req.json()
+    } catch (error) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      )
+    }
+
+    const { integration_id, action = 'connect' } = requestData
+
+    if (!integration_id) {
+      return new Response(
+        JSON.stringify({ error: 'integration_id is required' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      )
+    }
 
     console.log('WhatsApp connection request:', { integration_id, action })
 
@@ -35,6 +74,7 @@ serve(async (req) => {
       .single()
 
     if (integrationError || !integration) {
+      console.error('Integration not found:', integrationError)
       return new Response(
         JSON.stringify({ error: 'Integration not found' }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -59,7 +99,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('WhatsApp connection error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: 'Internal server error',
+        message: error.message 
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
