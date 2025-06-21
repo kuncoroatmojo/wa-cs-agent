@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useWhatsAppStore } from '../store/whatsappStore';
 import { useAuthStore } from '../store/authStore';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { supabase } from '../lib/supabase';
 
 const WhatsAppInstances: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [_selectedInstance, _setSelectedInstance] = useState<string | null>(null);
-  const { user } = useAuthStore();
+  const { profile } = useAuthStore();
   const {
     instances,
     isLoading,
@@ -21,16 +22,37 @@ const WhatsAppInstances: React.FC = () => {
   }, [fetchInstances]);
 
   const handleCreateInstance = async (name: string, connectionType: 'baileys' | 'cloud_api') => {
-    if (!user) return;
+    if (!profile) return;
 
     const result = await createInstance({
       name,
       connectionType,
-      userId: user.id
+      userId: profile.id
     });
 
     if (result.success) {
       setShowCreateModal(false);
+    }
+  };
+
+  const handleConnectInstance = async (instanceId: string) => {
+    try {
+      const connectResponse = await supabase.functions.invoke('whatsapp-connect', {
+        body: { 
+          integration_id: instanceId, 
+          action: 'connect' 
+        }
+      });
+
+      if (connectResponse.error) {
+        console.error('Failed to connect WhatsApp instance:', connectResponse.error);
+      } else {
+        console.log('WhatsApp instance connected:', connectResponse.data);
+        // Refresh instances to get updated status
+        await fetchInstances();
+      }
+    } catch (error) {
+      console.error('Failed to call whatsapp-connect function:', error);
     }
   };
 
@@ -146,11 +168,19 @@ const WhatsAppInstances: React.FC = () => {
                   <div className="mt-4">
                     <p className="text-sm font-medium text-gray-700 mb-2">Scan QR Code:</p>
                     <div className="bg-gray-100 p-4 rounded-lg">
-                      <img 
-                        src={`data:image/png;base64,${instance.qrCode}`}
-                        alt="QR Code"
-                        className="mx-auto h-32 w-32"
-                      />
+                      {instance.qrCode.startsWith('data:image') ? (
+                        <img 
+                          src={instance.qrCode}
+                          alt="QR Code"
+                          className="mx-auto h-32 w-32"
+                        />
+                      ) : (
+                        <div className="text-center">
+                          <p className="text-sm text-gray-600 mb-2">QR Code Generated</p>
+                          <p className="text-xs font-mono text-gray-800 break-all">{instance.qrCode}</p>
+                          <p className="text-xs text-blue-600 mt-2">Actual QR code will appear here when connected to Evolution API</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -163,6 +193,15 @@ const WhatsAppInstances: React.FC = () => {
                   >
                     Settings
                   </button>
+                  {instance.status === 'disconnected' && instance.connectionType === 'baileys' && (
+                    <button
+                      type="button"
+                      className="btn-primary text-sm"
+                      onClick={() => handleConnectInstance(instance.id)}
+                    >
+                      Connect
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="btn-secondary text-sm text-red-600 hover:text-red-700"

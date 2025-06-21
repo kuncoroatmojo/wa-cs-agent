@@ -89,7 +89,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      const { error } = await supabase
+      const { data: instance, error } = await supabase
         .from('whatsapp_instances')
         .insert({
           name: data.name || '',
@@ -114,7 +114,29 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
 
       if (error) throw error;
 
-      // Refresh instances
+      // For Baileys connections, immediately start the connection to generate QR code
+      if ((data.connectionType || 'baileys') === 'baileys') {
+        try {
+          const connectResponse = await supabase.functions.invoke('whatsapp-connect', {
+            body: { 
+              integration_id: instance.id, 
+              action: 'connect' 
+            }
+          });
+
+          if (connectResponse.error) {
+            console.error('Failed to start WhatsApp connection:', connectResponse.error);
+            // Don't fail the entire operation, just log the error
+          } else {
+            console.log('WhatsApp connection started:', connectResponse.data);
+          }
+        } catch (connectError) {
+          console.error('Failed to call whatsapp-connect function:', connectError);
+          // Don't fail the entire operation, just log the error
+        }
+      }
+
+      // Refresh instances to get the latest status including any QR code
       await get().fetchInstances();
       
       set({ isLoading: false });
