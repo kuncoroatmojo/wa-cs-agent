@@ -57,12 +57,8 @@ export const useAuthStore = create<AuthStore>()(
               const newProfile = {
                 id: data.user.id,
                 email: data.user.email || '',
-                full_name: data.user.user_metadata?.full_name || '',
-                avatar_url: data.user.user_metadata?.avatar_url,
-                role: 'user' as const,
-                settings: {},
-                subscription_tier: 'free' as const,
-                subscription_status: 'active' as const
+                full_name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || 'User',
+                avatar_url: data.user.user_metadata?.avatar_url || null
               };
 
               const { data: createdProfile, error: createError } = await supabase
