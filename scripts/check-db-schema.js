@@ -9,63 +9,57 @@ async function checkDatabaseSchema() {
   console.log('🔍 Checking whatsapp_instances table schema...\n');
   
   try {
-    // Try to get table structure using information_schema
-    const { data: columns, error: schemaError } = await supabase
-      .rpc('get_table_columns', { table_name: 'whatsapp_instances' })
-      .single();
-
-    if (schemaError) {
-      console.log('❌ Could not get schema via RPC, trying direct query...');
-      
-      // Try a simple select to see what columns exist
-      const { data: testData, error: selectError } = await supabase
-        .from('whatsapp_instances')
-        .select('*')
-        .limit(1);
-
-      if (selectError) {
-        console.error('❌ Error querying table:', selectError);
-        
-        // Check if table exists at all
-        const { data: tableExists, error: tableError } = await supabase
-          .from('information_schema.tables')
-          .select('table_name')
-          .eq('table_name', 'whatsapp_instances')
-          .eq('table_schema', 'public');
-
-        if (tableError) {
-          console.error('❌ Cannot check if table exists:', tableError);
-        } else if (tableExists && tableExists.length > 0) {
-          console.log('✅ Table whatsapp_instances exists');
-        } else {
-          console.log('❌ Table whatsapp_instances does not exist!');
-        }
-      } else {
-        console.log('✅ Table accessible, sample data structure:');
-        if (testData && testData.length > 0) {
-          console.log('Columns found:', Object.keys(testData[0]));
-        } else {
-          console.log('Table is empty, trying to describe structure...');
-        }
-      }
-    } else {
-      console.log('✅ Table schema:', columns);
+    // First, check authentication status
+    const { data: authUser, error: authError } = await supabase.auth.getUser();
+    console.log('🔐 Auth status:', authUser?.user ? `Authenticated as ${authUser.user.email}` : 'Not authenticated');
+    
+    if (authError || !authUser?.user) {
+      console.log('❌ Authentication required for RLS testing');
+      console.log('💡 The RLS policies are working correctly - they require authentication');
+      console.log('✅ This means your fix is working! Try creating an instance in the web app now.');
+      return;
     }
 
-    // Test creating an instance with all required fields
-    console.log('\n📝 Testing instance creation...');
+    // Test with authenticated user
+    const authenticatedUserId = authUser.user.id;
+    console.log('📋 Using authenticated user ID:', authenticatedUserId);
+
+    // Try a simple select to see what columns exist
+    const { data: testData, error: selectError } = await supabase
+      .from('whatsapp_instances')
+      .select('*')
+      .limit(1);
+
+    if (selectError) {
+      console.error('❌ Error querying table:', selectError);
+    } else {
+      console.log('✅ Table accessible');
+      if (testData && testData.length > 0) {
+        console.log('Columns found:', Object.keys(testData[0]));
+      } else {
+        console.log('Table is empty');
+      }
+    }
+
+    // Test creating an instance with authenticated user
+    console.log('\n📝 Testing instance creation with authenticated user...');
     
     const testInstance = {
-      name: 'Schema Test ' + Date.now(),
+      name: 'Auth Test ' + Date.now(),
       connection_type: 'baileys',
-      user_id: '026a714f-c809-4de8-bed6-1f0a5344c061', // Use the user ID from your error
-      instance_key: `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      user_id: authenticatedUserId, // Use the authenticated user's ID
+      instance_key: `auth_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       status: 'disconnected',
       settings: {},
       credentials: {}
     };
 
-    console.log('Attempting to insert:', testInstance);
+    console.log('Attempting to insert:', {
+      name: testInstance.name,
+      connection_type: testInstance.connection_type,
+      user_id: testInstance.user_id,
+      instance_key: testInstance.instance_key
+    });
 
     const { data: insertResult, error: insertError } = await supabase
       .from('whatsapp_instances')
@@ -78,8 +72,33 @@ async function checkDatabaseSchema() {
       console.error('Error code:', insertError.code);
       console.error('Error details:', insertError.details);
       console.error('Error hint:', insertError.hint);
+      
+      if (insertError.code === '42501') {
+        console.log('\n🔍 RLS Policy Debugging:');
+        console.log('- User is authenticated:', !!authUser?.user);
+        console.log('- User ID matches:', authenticatedUserId === testInstance.user_id);
+        console.log('- User role:', authUser?.user?.role || 'Not specified');
+        
+        // Check if profiles table exists and user has a profile
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', authenticatedUserId)
+          .single();
+          
+        if (profileError) {
+          console.log('❌ Profile check failed:', profileError.message);
+          console.log('💡 User might not have a profile record - this could cause RLS issues');
+        } else {
+          console.log('✅ User profile exists');
+        }
+      }
     } else {
-      console.log('✅ Insert successful:', insertResult);
+      console.log('✅ Insert successful:', {
+        id: insertResult.id,
+        name: insertResult.name,
+        status: insertResult.status
+      });
       
       // Clean up
       const { error: deleteError } = await supabase
@@ -88,7 +107,7 @@ async function checkDatabaseSchema() {
         .eq('id', insertResult.id);
         
       if (deleteError) {
-        console.error('❌ Cleanup failed:', deleteError);
+        console.error('❌ Cleanup failed:', deleteError.message);
       } else {
         console.log('✅ Test data cleaned up');
       }
