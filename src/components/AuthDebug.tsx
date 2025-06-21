@@ -12,7 +12,15 @@ const AuthDebug: React.FC = () => {
     setResult('Testing sign up...');
     
     try {
-      const { data, error } = await auth.signUp(email, password, { name: 'Test User' });
+      const { data, error } = await auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: 'Test User'
+          }
+        }
+      });
       
       if (error) {
         setResult(`Sign up error: ${error.message}`);
@@ -33,7 +41,10 @@ const AuthDebug: React.FC = () => {
     setResult('Testing sign in...');
     
     try {
-      const { data, error } = await auth.signIn(email, password);
+      const { data, error } = await auth.signInWithPassword({
+        email,
+        password
+      });
       
       if (error) {
         setResult(`Sign in error: ${error.message}`);
@@ -54,7 +65,7 @@ const AuthDebug: React.FC = () => {
     setResult('Testing Supabase connection...');
     
     try {
-      const { user, error } = await auth.getUser();
+      const { data: { user }, error } = await auth.getUser();
       
       if (error) {
         setResult(`Connection test error: ${error.message}`);
