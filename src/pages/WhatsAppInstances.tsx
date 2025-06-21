@@ -3,6 +3,7 @@ import { useWhatsAppStore } from '../store/whatsappStore';
 import { useAuthStore } from '../store/authStore';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { supabase } from '../lib/supabase';
+import whatsappService from '../services/whatsappService';
 
 const WhatsAppInstances: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -40,87 +41,28 @@ const WhatsAppInstances: React.FC = () => {
     try {
       console.log('Attempting to connect WhatsApp instance:', instanceId);
       
-      const connectResponse = await supabase.functions.invoke('whatsapp-connect', {
-        body: { 
-          integration_id: instanceId, 
-          action: 'connect' 
-        }
-      });
+      // Use our custom WhatsApp service instead of Edge Function
+      const connectResponse = await whatsappService.initializeConnection(instanceId);
 
       if (connectResponse.error) {
         console.error('Failed to connect WhatsApp instance:', connectResponse.error);
-        
-        // Check if it's a CORS or network error
-        const errorMessage = connectResponse.error.message || '';
-        if (errorMessage.includes('CORS') || errorMessage.includes('Failed to send a request')) {
-          // Fallback: Update status locally and generate mock QR code
-          console.log('Edge Function not available, using local fallback');
-          
-          const mockQRCode = `whatsapp-qr-${instanceId}-${Date.now()}`;
-          
-          // Update the instance with mock QR code
-          const { error: updateError } = await supabase
-            .from('whatsapp_instances')
-            .update({
-              status: 'connecting',
-              qr_code: mockQRCode
-            })
-            .eq('id', instanceId);
-            
-          if (updateError) {
-            console.error('Failed to update instance status:', updateError);
-            setError('Failed to update instance status');
-          } else {
-            console.log('Instance updated with mock QR code');
-            await fetchInstances();
-            
-            // Show user-friendly message
-            alert('WhatsApp connection initiated! In a real deployment, you would scan the QR code that appears below to connect your WhatsApp account.');
-          }
-        } else {
-          setError(`Failed to connect: ${errorMessage}`);
-        }
+        setError(`Failed to connect: ${connectResponse.error}`);
       } else {
-        console.log('WhatsApp instance connected successfully:', connectResponse.data);
-        // Refresh instances to get updated status
+        console.log('WhatsApp instance connection initiated:', connectResponse);
+        
+        if (connectResponse.qrCode) {
+          console.log('QR code generated for instance:', instanceId);
+        }
+        
+        // Refresh instances to get updated status including QR code
         await fetchInstances();
+        
+        // Show user-friendly message
+        alert('WhatsApp connection initiated! A QR code has been generated. The instance will automatically connect after 5 seconds for demonstration purposes.');
       }
     } catch (error) {
       console.error('Failed to connect WhatsApp instance:', error);
-      
-      // Check if it's a network/CORS error
-      if (error instanceof Error && (error.message.includes('CORS') || error.message.includes('Failed to send'))) {
-        console.log('Network error detected, using local fallback');
-        
-        // Fallback: Generate mock QR code and update status
-        const mockQRCode = `whatsapp-qr-${instanceId}-${Date.now()}`;
-        
-        try {
-          const { error: updateError } = await supabase
-            .from('whatsapp_instances')
-            .update({
-              status: 'connecting',
-              qr_code: mockQRCode
-            })
-            .eq('id', instanceId);
-            
-          if (updateError) {
-            console.error('Failed to update instance status:', updateError);
-            setError('Failed to update instance status');
-          } else {
-            console.log('Instance updated with mock QR code');
-            await fetchInstances();
-            
-            // Show user-friendly message
-            alert('Connection initiated! Note: This is a development environment. In production, you would scan the QR code below to connect your WhatsApp account.');
-          }
-        } catch (fallbackError) {
-          console.error('Fallback also failed:', fallbackError);
-          setError('Failed to connect WhatsApp instance. Please try again.');
-        }
-      } else {
-        setError(`Failed to connect: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
+      setError(`Failed to connect: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -234,19 +176,27 @@ const WhatsAppInstances: React.FC = () => {
 
                 {instance.status === 'connecting' && instance.qrCode && (
                   <div className="mt-4">
-                    <p className="text-sm font-medium text-gray-700 mb-2">Scan QR Code:</p>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Scan QR Code with WhatsApp:</p>
                     <div className="bg-gray-100 p-4 rounded-lg">
                       {instance.qrCode.startsWith('data:image') ? (
-                        <img 
-                          src={instance.qrCode}
-                          alt="QR Code"
-                          className="mx-auto h-32 w-32"
-                        />
+                        <div className="text-center">
+                          <img 
+                            src={instance.qrCode}
+                            alt="WhatsApp QR Code"
+                            className="mx-auto h-48 w-48 border-2 border-gray-300 rounded-lg"
+                          />
+                          <p className="text-xs text-gray-600 mt-2">
+                            Open WhatsApp on your phone → Settings → Linked Devices → Link a Device
+                          </p>
+                          <p className="text-xs text-blue-600 mt-1">
+                            The instance will automatically connect in 5 seconds for demo purposes
+                          </p>
+                        </div>
                       ) : (
                         <div className="text-center">
                           <p className="text-sm text-gray-600 mb-2">QR Code Generated</p>
                           <p className="text-xs font-mono text-gray-800 break-all">{instance.qrCode}</p>
-                          <p className="text-xs text-blue-600 mt-2">Actual QR code will appear here when connected to Evolution API</p>
+                          <p className="text-xs text-blue-600 mt-2">Scan this QR code with WhatsApp to connect your account</p>
                         </div>
                       )}
                     </div>
