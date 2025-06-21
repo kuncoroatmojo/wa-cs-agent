@@ -91,30 +91,39 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
     try {
       const instanceKey = `instance_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
+      const insertData = {
+        name: data.name || '',
+        connection_type: data.connectionType || 'baileys',
+        user_id: data.userId || '',
+        instance_key: instanceKey,
+        settings: data.settings || {
+          autoReply: true,
+          businessHours: {
+            enabled: false,
+            timezone: 'UTC',
+            schedule: {}
+          },
+          welcomeMessage: 'Hello! How can I help you today?',
+          outOfHoursMessage: 'We are currently closed. Please try again during business hours.',
+          humanHandoffKeywords: ['human', 'agent', 'support'],
+          maxResponseTime: 30
+        }
+      };
+
+      console.log('Creating WhatsApp instance with data:', insertData);
+
       const { data: instance, error } = await supabase
         .from('whatsapp_instances')
-        .insert({
-          name: data.name || '',
-          connection_type: data.connectionType || 'baileys',
-          user_id: data.userId || '',
-          instance_key: instanceKey,
-          settings: data.settings || {
-            autoReply: true,
-            businessHours: {
-              enabled: false,
-              timezone: 'UTC',
-              schedule: {}
-            },
-            welcomeMessage: 'Hello! How can I help you today?',
-            outOfHoursMessage: 'We are currently closed. Please try again during business hours.',
-            humanHandoffKeywords: ['human', 'agent', 'support'],
-            maxResponseTime: 30
-          }
-        })
+        .insert(insertData)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase insert error:', error);
+        throw error;
+      }
+
+      console.log('WhatsApp instance created successfully:', instance);
 
       // For Baileys connections, immediately start the connection to generate QR code
       if ((data.connectionType || 'baileys') === 'baileys') {
@@ -144,6 +153,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       set({ isLoading: false });
       return { success: true };
     } catch (error) {
+      console.error('Create instance error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create instance';
       set({ error: errorMessage, isLoading: false });
       return { success: false, error: errorMessage };
