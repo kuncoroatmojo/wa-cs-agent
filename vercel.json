@@ -13,8 +13,7 @@
   },
   "git": {
     "deploymentEnabled": {
-      "main": true,
-      "staging": true
+      "main": true
     }
   },
   "build": {
@@ -23,16 +22,6 @@
       "SUPABASE_ANON_KEY": "@supabase_anon_key",
       "VITE_EVOLUTION_API_URL": "@evolution_api_url",
       "VITE_EVOLUTION_API_KEY": "@evolution_api_key"
-    }
-  },
-  "functions": {
-    "src/main.tsx": {
-      "maxDuration": 30
-    },
-    "supabase/functions/**/*.ts": {
-      "runtime": "nodejs20.x",
-      "memory": 512,
-      "maxDuration": 30
     }
   },
   "rewrites": [
@@ -56,41 +45,15 @@
         {
           "key": "X-XSS-Protection",
           "value": "1; mode=block"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "geolocation=(), microphone=(), camera=()"
         }
       ]
     },
     {
-      "source": "/static/(.*)",
+      "source": "/assets/*",
       "headers": [
         {
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/(.*\\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot))",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/manifest.json",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=86400"
         }
       ]
     }
@@ -103,15 +66,5 @@
     }
   ],
   "trailingSlash": false,
-  "cleanUrls": true,
-  "crons": [
-    {
-      "path": "/api/cron/cleanup",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/analytics",
-      "schedule": "0 1 * * *"
-    }
-  ]
-} 
+  "cleanUrls": true
+}
