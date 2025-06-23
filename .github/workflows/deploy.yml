@@ -1,17 +1,10 @@
-name: Deploy to Vercel
+name: CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
-      - develop
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
-
-env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    branches: [ main ]
 
 jobs:
   # =====================================================
@@ -78,150 +71,58 @@ jobs:
           fail_ci_if_error: false
 
   # =====================================================
-  # DEPLOYMENT NOTIFICATION
+  # DEPLOYMENT
   # =====================================================
-  deployment-status:
-    name: Deployment Status
-    runs-on: ubuntu-latest
-    needs: [quality-checks, test]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - name: Check deployment readiness
-        run: |
-          echo "🚀 Code quality checks passed!"
-          echo "✅ All tests passed!"
-          echo "📦 Build successful!"
-          echo ""
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
-            echo "⚠️  Automatic deployment not configured"
-            echo "To enable automatic deployments, please configure these secrets:"
-            echo "   - VERCEL_TOKEN"
-            echo "   - VERCEL_ORG_ID" 
-            echo "   - VERCEL_PROJECT_ID"
-            echo ""
-            echo "Manual deployment: Run 'vercel --prod' locally"
-            echo "Production URL: https://wacanda.vercel.app"
-          else
-            echo "🎯 Ready for automatic deployment!"
-            echo "Deployment will be handled by the production deployment job"
-          fi
-
-  # =====================================================
-  # PRODUCTION DEPLOYMENT (Only if secrets exist)
-  # =====================================================
-  production-deployment:
-    name: Production Deployment
+  deploy:
+    name: Deploy to Vercel
     runs-on: ubuntu-latest
     environment: WACANDA_PROD
-    needs: quality-checks
+    needs: [quality-checks, test]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    outputs:
-      production_url: ${{ steps.deploy.outputs.production_url }}
-      has_secrets: ${{ steps.check-secrets.outputs.has_secrets }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check for secrets
-        id: check-secrets
-        run: |
-          if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
-            echo "has_secrets=true" >> $GITHUB_OUTPUT
-            echo "✅ Deployment secrets found"
-          else
-            echo "has_secrets=false" >> $GITHUB_OUTPUT
-            echo "⚠️ No deployment secrets - skipping automatic deployment"
-            echo "production_url=https://wacanda.vercel.app" >> $GITHUB_OUTPUT
-          fi
-
       - name: Setup Node.js
-        if: steps.check-secrets.outputs.has_secrets == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
-        if: steps.check-secrets.outputs.has_secrets == 'true'
         run: npm ci
 
-      - name: Install Vercel CLI
-        if: steps.check-secrets.outputs.has_secrets == 'true'
-        run: npm install --global vercel@latest
+      - name: Build project
+        run: npm run build
 
       - name: Deploy to Vercel
-        id: deploy
-        if: steps.check-secrets.outputs.has_secrets == 'true'
-        run: |
-          # Deploy with error handling
-          if url=$(vercel --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1); then
-            echo "production_url=$url" >> $GITHUB_OUTPUT
-            echo "✅ Deployed to: $url"
-          else
-            echo "❌ Deployment failed, using fallback URL"
-            echo "production_url=https://wacanda.vercel.app" >> $GITHUB_OUTPUT
-          fi
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
 
   # =====================================================
-  # POST-DEPLOYMENT CHECKS
+  # NOTIFICATION
   # =====================================================
-  post-deployment:
-    name: Post-Deployment Checks
+  notify:
+    name: Deployment Status
     runs-on: ubuntu-latest
-    needs: production-deployment
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [deploy]
+    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-      - name: Health check
-        run: |
-          url="${{ needs.production-deployment.outputs.production_url }}"
-          if [ -z "$url" ] || [ "$url" = "null" ]; then
-            url="https://wacanda.vercel.app"
-          fi
-          echo "🏥 Checking health of: $url"
-          
-          # Wait for deployment to be ready
-          sleep 30
-          
-          # Basic health check with retries
-          max_retries=3
-          retry_count=0
-          
-          while [ $retry_count -lt $max_retries ]; do
-            status=$(curl -s -o /dev/null -w "%{http_code}" "$url" || echo "000")
-            
-            if [ "$status" -eq 200 ]; then
-              echo "✅ Health check passed: HTTP $status"
-              break
-            else
-              retry_count=$((retry_count + 1))
-              echo "❌ Health check failed: HTTP $status (attempt $retry_count/$max_retries)"
-              
-              if [ $retry_count -lt $max_retries ]; then
-                echo "⏳ Retrying in 30 seconds..."
-                sleep 30
-              else
-                echo "⚠️ All health check attempts failed"
-                echo "💡 This may be normal for new deployments - manual verification recommended"
-                echo "🔗 URL: $url"
-              fi
-            fi
-          done
-
-      - name: Deployment summary
+      - name: Deployment Summary
         run: |
           echo "## 🚀 Deployment Summary"
-          echo "**Environment:** Production"
-          echo "**URL:** ${{ needs.production-deployment.outputs.production_url || 'https://wacanda.vercel.app' }}"
-          echo "**Has Secrets:** ${{ needs.production-deployment.outputs.has_secrets || 'false' }}"
+          echo "**Status:** ${{ needs.deploy.result }}"
+          echo "**URL:** https://wacanda.vercel.app"
           echo "**Commit:** ${{ github.sha }}"
           echo "**Time:** $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          echo ""
-          if [ "${{ needs.production-deployment.outputs.has_secrets }}" = "true" ]; then
-            echo "✅ Automatic deployment completed"
+          
+          if [ "${{ needs.deploy.result }}" = "success" ]; then
+            echo "✅ Deployment successful!"
           else
-            echo "⚠️ Manual deployment required"
-            echo "Run: vercel --prod"
-          fi 
+            echo "❌ Deployment failed"
+            echo "Check the logs above for details"
+          fi
