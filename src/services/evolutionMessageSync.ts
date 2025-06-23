@@ -593,6 +593,7 @@ export class EvolutionMessageSyncService {
       
       // Progress update for large conversations
       if (newMessages.length > 100 && processedCount % 100 === 0) {
+        console.log(`Processed ${processedCount}/${newMessages.length} messages for conversation ${remoteJid}`);
       }
     }
 

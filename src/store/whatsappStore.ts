@@ -81,7 +81,8 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       }));
 
       set({ instances, isLoading: false });
-    } catch { // Ignored 
+    } catch (error) {
+      console.error('Error fetching instances:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch instances',
         isLoading: false 
@@ -141,8 +142,9 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
             console.error('Failed to start WhatsApp connection:', connectResponse.error);
             // Don't fail the entire operation, just log the error
           } else {
+            console.log('WhatsApp connection started successfully');
           }
-        } catch { // Ignored 
+        } catch (connectError) {
           console.error('Failed to call whatsapp-connect function:', connectError);
           // Don't fail the entire operation, just log the error
         }
@@ -153,7 +155,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       
       set({ isLoading: false });
       return { success: true };
-    } catch { // Ignored 
+    } catch (error) {
       console.error('Create instance error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create instance';
       set({ error: errorMessage, isLoading: false });
@@ -184,7 +186,8 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       
       set({ isLoading: false });
       return { success: true };
-    } catch { // Ignored 
+    } catch (error) {
+      console.error('Update instance error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to update instance';
       set({ error: errorMessage, isLoading: false });
       return { success: false, error: errorMessage };
@@ -212,7 +215,8 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       });
       
       return { success: true };
-    } catch { // Ignored 
+    } catch (error) {
+      console.error('Delete instance error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete instance';
       set({ error: errorMessage, isLoading: false });
       return { success: false, error: errorMessage };
@@ -266,7 +270,8 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       }));
 
       set({ conversations, isLoading: false });
-    } catch { // Ignored 
+    } catch (error) {
+      console.error('Fetch conversations error:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch conversations',
         isLoading: false 
@@ -295,7 +300,8 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       }
 
       return { success: true };
-    } catch { // Ignored 
+    } catch (error) {
+      console.error('Send message error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
       return { success: false, error: errorMessage };
     }
@@ -364,7 +370,8 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       });
       
       return { success: true };
-    } catch { // Ignored 
+    } catch (error) {
+      console.error('Cleanup instances error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to cleanup instances';
       set({ error: errorMessage, isLoading: false });
       return { success: false, error: errorMessage };
