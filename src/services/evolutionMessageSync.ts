@@ -95,7 +95,6 @@ export class EvolutionMessageSyncService {
       throw new Error('Evolution API credentials not configured');
     }
 
-    console.log('  - Evolution API URL:', this.evolutionApiUrl);
     console.log('  - Evolution API Key:', this.evolutionApiKey.substring(0, 8) + '...');
     
     this.initialized = true;
@@ -348,7 +347,6 @@ export class EvolutionMessageSyncService {
 
 
       if (progress.errors.length > 0) {
-        console.warn(`Sync completed with ${progress.errors.length} errors`);
       }
 
     } catch (error) { 
@@ -591,7 +589,6 @@ export class EvolutionMessageSyncService {
       
       // Progress update for large conversations
       if (newMessages.length > 100 && processedCount % 100 === 0) {
-        console.log(`Processed ${processedCount}/${newMessages.length} messages for conversation ${remoteJid}`);
       }
     }
 

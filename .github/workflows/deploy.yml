@@ -112,6 +112,7 @@ jobs:
   production-deployment:
     name: Production Deployment
     runs-on: ubuntu-latest
+    environment: WACANDA_PROD
     needs: quality-checks
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     outputs:
