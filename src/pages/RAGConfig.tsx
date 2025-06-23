@@ -69,7 +69,7 @@ const RAGConfig: React.FC = () => {
       setShowForm(false)
       setEditingConfig(null)
       resetForm()
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to save configuration:', error)
     }
   }

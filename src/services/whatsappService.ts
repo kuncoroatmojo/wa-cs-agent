@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { generateQRCodeDataURL } from '../utils/qrCode';
 import { evolutionApiService } from './evolutionApiService';
-import type { WhatsAppInstance, WhatsAppMessage } from '../types';
+import type { WhatsAppInstance } from '../types';
 
 export interface WhatsAppConnectionStatus {
   status: 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -36,7 +36,7 @@ class WhatsAppService {
 
       // Fallback to mock behavior for demo instances
       return this.initializeMockConnection(instanceId);
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to initialize WhatsApp connection:', error);
       return {
         status: 'error',
@@ -88,7 +88,7 @@ class WhatsAppService {
         qrCode: data.qr_code,
         phoneNumber: data.phone_number
       };
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to get connection status:', error);
       return {
         status: 'error',
@@ -111,7 +111,7 @@ class WhatsAppService {
         if (status.status === 'connected' || status.status === 'error') {
           this.stopStatusPolling(instanceId);
         }
-      } catch { // Ignored 
+      } catch (error) { 
         console.error('Status polling error:', error);
       }
     }, 2000);
@@ -152,7 +152,7 @@ class WhatsAppService {
       if (error) throw error;
 
       return { success: true };
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to send message:', error);
       return {
         success: false,
@@ -171,7 +171,7 @@ class WhatsAppService {
       this.emitEvent(instanceId, 'disconnect', { instanceId });
       
       return { success: true };
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to disconnect instance:', error);
       return {
         success: false,
@@ -202,7 +202,7 @@ class WhatsAppService {
         .eq('id', instanceId);
 
       if (error) throw error;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to update instance in database:', error);
     }
   }
@@ -228,7 +228,7 @@ class WhatsAppService {
       listeners.forEach(callback => {
         try {
           callback({ type, data, instanceId });
-        } catch { // Ignored 
+        } catch (error) { 
           console.error('Event listener error:', error);
         }
       });
@@ -267,7 +267,7 @@ class WhatsAppService {
       // Delete from Evolution API first
       try {
         await evolutionApiService.deleteInstance(instance.instance_key);
-      } catch { // Ignored 
+      } catch (error) { 
         // Continue with database deletion even if Evolution API fails
       }
 
@@ -282,7 +282,7 @@ class WhatsAppService {
       }
 
       return { success: true };
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error deleting instance:', error);
       return { 
         success: false, 
@@ -308,7 +308,7 @@ class WhatsAppService {
       let evolutionInstances;
       try {
         evolutionInstances = await evolutionApiService.fetchInstances();
-      } catch { // Ignored 
+      } catch (error) { 
         console.error('Failed to fetch Evolution API instances:', error);
         evolutionInstances = [];
       }
@@ -342,7 +342,7 @@ class WhatsAppService {
             if (evolutionInstance) {
               try {
                 await evolutionApiService.deleteInstance(dbInstance.instance_key);
-              } catch { // Ignored 
+              } catch (error) { 
               }
             }
 
@@ -358,7 +358,7 @@ class WhatsAppService {
 
             results.removed++;
           }
-        } catch { // Ignored 
+        } catch (error) { 
           results.failed++;
           results.errors.push(`Failed to process ${dbInstance.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
           console.error(`❌ Error processing instance ${dbInstance.name}:`, error);
@@ -369,7 +369,7 @@ class WhatsAppService {
         success: true, 
         error: results.failed > 0 ? `Failed to remove ${results.failed} instances` : undefined
       };
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error during cleanup:', error);
       return { 
         success: false, 

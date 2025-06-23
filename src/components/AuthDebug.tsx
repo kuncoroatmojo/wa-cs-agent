@@ -29,7 +29,7 @@ const AuthDebug: React.FC = () => {
       } else {
         setResult('Sign up completed but no user data returned');
       }
-    } catch { // Ignored 
+    } catch (error) { 
       setResult(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
@@ -53,7 +53,7 @@ const AuthDebug: React.FC = () => {
       } else {
         setResult('Sign in completed but no user data returned');
       }
-    } catch { // Ignored 
+    } catch (error) { 
       setResult(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
@@ -74,7 +74,7 @@ const AuthDebug: React.FC = () => {
       } else {
         setResult('Connection successful! No current user.');
       }
-    } catch { // Ignored 
+    } catch (error) { 
       setResult(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     

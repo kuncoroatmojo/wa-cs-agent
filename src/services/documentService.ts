@@ -37,7 +37,7 @@ export class DocumentService {
       await supabase.functions.invoke('document-process', {
         body: { document_id: data.id }
       })
-    } catch { // Ignored 
+    } catch (error) { 
     }
 
     return data

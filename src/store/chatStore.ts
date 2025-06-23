@@ -46,7 +46,7 @@ export const useChatStore = create<ChatState>()(
           const sessions = await chatService.getSessionsBySender('current-user-id') // Replace with actual user ID
           
           set({ sessions, loading: false })
-        } catch { // Ignored 
+        } catch (error) { 
           set({ 
             error: error instanceof Error ? error.message : 'Failed to fetch sessions',
             loading: false 
@@ -67,7 +67,7 @@ export const useChatStore = create<ChatState>()(
             messages: messages.reverse(), // Most recent first for UI
             loading: false 
           })
-        } catch { // Ignored 
+        } catch (error) { 
           set({ 
             error: error instanceof Error ? error.message : 'Failed to fetch session',
             loading: false 
@@ -97,7 +97,7 @@ export const useChatStore = create<ChatState>()(
           })
           
           return session
-        } catch { // Ignored 
+        } catch (error) { 
           set({ 
             error: error instanceof Error ? error.message : 'Failed to create session',
             loading: false 
@@ -148,7 +148,7 @@ export const useChatStore = create<ChatState>()(
             })
           }
           
-        } catch { // Ignored 
+        } catch (error) { 
           set({ 
             error: error instanceof Error ? error.message : 'Failed to send message',
             loading: false 

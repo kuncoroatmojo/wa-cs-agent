@@ -530,7 +530,7 @@ export class HandoffService {
       await this.updateSessionHandoffStatus(sessionId, 'pending')
 
       return data
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error creating handoff request:', error)
       throw error
     }
@@ -563,7 +563,7 @@ export class HandoffService {
 
       if (error) throw error
       return data || []
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error fetching pending handoff requests:', error)
       return []
     }
@@ -596,7 +596,7 @@ export class HandoffService {
       await this.updateSessionHandoffStatus(data.session_id, 'assigned')
 
       return data
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error assigning handoff request:', error)
       throw error
     }
@@ -627,7 +627,7 @@ export class HandoffService {
 
       // Update session status back to AI
       await this.updateSessionHandoffStatus(data.session_id, 'resolved')
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error resolving handoff request:', error)
       throw error
     }
@@ -650,7 +650,7 @@ export class HandoffService {
           }
         })
         .eq('id', sessionId)
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error updating session handoff status:', error)
     }
   }
@@ -688,7 +688,7 @@ export class HandoffService {
             created_at: new Date().toISOString()
           }
         })
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error notifying agents:', error)
     }
   }
@@ -734,7 +734,7 @@ export class HandoffService {
         },
         avgResolutionTime: this.calculateAverageResolutionTime(requests)
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error fetching handoff statistics:', error)
       return {
         total: 0,

@@ -145,7 +145,7 @@ export class ChatService {
         userMessage,
         aiResponse: aiMessage
       }
-    } catch { // Ignored 
+    } catch (error) { 
       // If AI response fails, store an error message
       const errorMessage = await this.sendMessage(
         sessionId,

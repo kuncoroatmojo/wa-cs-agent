@@ -227,7 +227,7 @@ export class CacheService {
           this.set(namespace, key, value)
         })
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error preloading cache:', error)
     }
   }
@@ -252,7 +252,7 @@ export class CacheService {
       const value = await fetcher()
       this.set(namespace, key, value, customTTL)
       return value
-    } catch { // Ignored 
+    } catch (error) { 
       console.error(`Error fetching data for cache key ${key}:`, error)
       throw error
     }
@@ -336,7 +336,7 @@ export class CacheService {
           this.set(namespace, target.key, data)
         }
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error warming cache:', error)
     }
   }
@@ -364,7 +364,7 @@ export class CacheService {
 
       // Local invalidation
       keys.forEach(key => this.delete(namespace, key))
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error broadcasting cache invalidation:', error)
     }
   }
@@ -398,7 +398,7 @@ export class CacheService {
     try {
       const compressed = this.compressValue(value)
       return this.set(namespace, key, compressed, customTTL)
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error setting compressed cache value:', error)
       return false
     }
@@ -413,7 +413,7 @@ export class CacheService {
       if (compressed === null) return null
       
       return this.decompressValue(compressed)
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error getting compressed cache value:', error)
       return null
     }
@@ -568,7 +568,7 @@ export class CacheService {
         ...(sessions || []).map(s => ({ type: 'session', data: s })),
         ...(documents || []).map(d => ({ type: 'document', data: d }))
       ]
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error analyzing user activity patterns:', error)
       return []
     }

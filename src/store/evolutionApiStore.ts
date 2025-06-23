@@ -106,7 +106,7 @@ export const useEvolutionApiStore = create<EvolutionApiStore>()(
           }
           
           return result;
-        } catch { // Ignored 
+        } catch (error) { 
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           set({ 
             loading: false,
@@ -133,7 +133,7 @@ export const useEvolutionApiStore = create<EvolutionApiStore>()(
             loading: false,
             error: null 
           });
-        } catch { // Ignored 
+        } catch (error) { 
           const errorMessage = error instanceof Error ? error.message : 'Failed to fetch instances';
           set({ 
             loading: false,
@@ -160,7 +160,7 @@ export const useEvolutionApiStore = create<EvolutionApiStore>()(
             loading: false,
             error: null 
           });
-        } catch { // Ignored 
+        } catch (error) { 
           const errorMessage = error instanceof Error ? error.message : 'Failed to sync instances';
           set({ 
             loading: false,
@@ -189,7 +189,7 @@ export const useEvolutionApiStore = create<EvolutionApiStore>()(
           });
           
           return newInstance;
-        } catch { // Ignored 
+        } catch (error) { 
           const errorMessage = error instanceof Error ? error.message : 'Failed to create instance';
           set({ 
             loading: false,
@@ -217,7 +217,7 @@ export const useEvolutionApiStore = create<EvolutionApiStore>()(
             loading: false,
             error: null 
           });
-        } catch { // Ignored 
+        } catch (error) { 
           const errorMessage = error instanceof Error ? error.message : 'Failed to delete instance';
           set({ 
             loading: false,
@@ -241,7 +241,7 @@ export const useEvolutionApiStore = create<EvolutionApiStore>()(
           set({ instances });
           
           return result;
-        } catch { // Ignored 
+        } catch (error) { 
           const errorMessage = error instanceof Error ? error.message : 'Failed to connect instance';
           set({ error: errorMessage });
           throw error;
@@ -260,7 +260,7 @@ export const useEvolutionApiStore = create<EvolutionApiStore>()(
           // Refresh instances to get updated status
           const instances = await evolutionApiService.fetchInstances();
           set({ instances });
-        } catch { // Ignored 
+        } catch (error) { 
           const errorMessage = error instanceof Error ? error.message : 'Failed to disconnect instance';
           set({ error: errorMessage });
           throw error;

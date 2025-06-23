@@ -63,7 +63,7 @@ export const useDocumentStore = create<DocumentState>()(
           const documents = await documentService.getDocuments('current-user-id', folderPath)
           
           set({ documents, documentsLoading: false })
-        } catch { // Ignored 
+        } catch (error) { 
           set({
             error: error instanceof Error ? error.message : 'Failed to fetch documents',
             documentsLoading: false
@@ -88,7 +88,7 @@ export const useDocumentStore = create<DocumentState>()(
           // Start polling for processing status
           get().pollDocumentStatus(document.id)
           
-        } catch { // Ignored 
+        } catch (error) { 
           set({
             error: error instanceof Error ? error.message : 'Failed to upload document',
             uploading: false
@@ -106,7 +106,7 @@ export const useDocumentStore = create<DocumentState>()(
             documents: documents.filter(doc => doc.id !== documentId),
             selectedDocument: get().selectedDocument?.id === documentId ? null : get().selectedDocument
           })
-        } catch { // Ignored 
+        } catch (error) { 
           set({
             error: error instanceof Error ? error.message : 'Failed to delete document'
           })
@@ -126,7 +126,7 @@ export const useDocumentStore = create<DocumentState>()(
           const webPages = await webPageService.getWebPages('current-user-id')
           
           set({ webPages, webPagesLoading: false })
-        } catch { // Ignored 
+        } catch (error) { 
           set({
             error: error instanceof Error ? error.message : 'Failed to fetch web pages',
             webPagesLoading: false
@@ -151,7 +151,7 @@ export const useDocumentStore = create<DocumentState>()(
           // Start polling for scraping status
           get().pollWebPageStatus(webPage.id)
           
-        } catch { // Ignored 
+        } catch (error) { 
           set({
             error: error instanceof Error ? error.message : 'Failed to add web page',
             processing: false
@@ -169,7 +169,7 @@ export const useDocumentStore = create<DocumentState>()(
             webPages: webPages.filter(page => page.id !== webPageId),
             selectedWebPage: get().selectedWebPage?.id === webPageId ? null : get().selectedWebPage
           })
-        } catch { // Ignored 
+        } catch (error) { 
           set({
             error: error instanceof Error ? error.message : 'Failed to delete web page'
           })
@@ -209,7 +209,7 @@ export const useDocumentStore = create<DocumentState>()(
                 clearInterval(pollInterval)
               }
             }
-          } catch { // Ignored 
+          } catch (error) { 
             console.error('Error polling document status:', error)
             clearInterval(pollInterval)
           }
@@ -239,7 +239,7 @@ export const useDocumentStore = create<DocumentState>()(
                 clearInterval(pollInterval)
               }
             }
-          } catch { // Ignored 
+          } catch (error) { 
             console.error('Error polling web page status:', error)
             clearInterval(pollInterval)
           }

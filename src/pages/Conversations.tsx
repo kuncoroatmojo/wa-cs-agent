@@ -377,7 +377,7 @@ const Conversations: React.FC = () => {
       const unifiedConversations = await conversationService.getAllConversations(profile!.id, filters);
       
       setConversations(unifiedConversations);
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error loading conversations:', error);
     } finally {
       setLoading(false);
@@ -391,7 +391,7 @@ const Conversations: React.FC = () => {
       const conversationMessages = await conversationService.getConversationMessages(conversationId, 50);
       
       setMessages(conversationMessages);
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error loading messages:', error);
       setMessages([]);
     } finally {
@@ -411,7 +411,7 @@ const Conversations: React.FC = () => {
       
       // Refresh conversations to update last message
       loadConversations();
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error sending message:', error);
       // TODO: Show error notification to user
     }

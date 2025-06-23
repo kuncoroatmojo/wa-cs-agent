@@ -328,7 +328,7 @@ export class EvolutionMessageSyncService {
             console.log(`📈 Progress: ${progress.processedConversations}/${progress.totalConversations} conversations (${completionPercent}%) | Avg: ${avgMsgPerConv} msgs/conv`);
           }
           
-        } catch { // Ignored 
+        } catch (error) { 
           const errorMsg = `Error syncing conversation ${remoteJid} (${messages.length} messages): ${error?.message || 'Unknown error'}`;
           console.error(`❌ ${errorMsg}`);
           progress.errors.push(errorMsg);
@@ -353,7 +353,7 @@ export class EvolutionMessageSyncService {
       if (progress.errors.length > 0) {
       }
 
-    } catch { // Ignored 
+    } catch (error) { 
       progress.status = 'error';
       progress.endTime = new Date();
       progress.errors.push(`Sync failed: ${error?.message || 'Unknown error'}`);
@@ -533,7 +533,7 @@ export class EvolutionMessageSyncService {
         }
         
         upsertSuccess = true;
-      } catch { // Ignored 
+      } catch (error) { 
         // Handle missing constraint or other upsert failures
         
         // Pre-filter messages by checking which ones already exist
@@ -570,7 +570,7 @@ export class EvolutionMessageSyncService {
                       await this.supabase
                         .from('conversation_messages')
                         .insert(message);
-                    } catch { // Ignored 
+                    } catch (error) { 
                       if (!individualError.message.includes('duplicate') && !individualError.message.includes('unique')) {
                         console.error(`❌ Failed to insert individual message ${message.external_message_id}:`, individualError.message);
                       }
@@ -581,7 +581,7 @@ export class EvolutionMessageSyncService {
                   throw insertError;
                 }
               }
-            } catch { // Ignored 
+            } catch (error) { 
               console.error(`❌ Failed to insert chunk for ${remoteJid}:`, chunkError.message);
               // Continue with next chunk
             }

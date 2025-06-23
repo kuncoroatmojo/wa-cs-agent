@@ -11,7 +11,8 @@ export class WebPageService {
     // Validate URL format
     try {
       new URL(url)
-    } catch { // Ignored 
+    } catch (error) { 
+      console.error('Invalid URL format:', error)
       throw new Error('Invalid URL format')
     }
 
@@ -34,7 +35,8 @@ export class WebPageService {
       await supabase.functions.invoke('webpage-scrape', {
         body: { webpage_id: data.id }
       })
-    } catch { // Ignored 
+    } catch (error) { 
+      console.error('Failed to trigger webpage scraping:', error)
     }
 
     return data
@@ -122,7 +124,8 @@ export class WebPageService {
       await supabase.functions.invoke('webpage-scrape', {
         body: { webpage_id: webPageId }
       })
-    } catch { // Ignored 
+    } catch (error) { 
+      console.error('Failed to restart scraping process:', error)
       throw new Error('Failed to restart scraping process')
     }
 
@@ -141,7 +144,7 @@ export class WebPageService {
       try {
         const webPage = await this.addWebPage(userId, url, includeChildren, maxDepth)
         webPages.push(webPage)
-      } catch { // Ignored 
+      } catch (error) { 
         console.error(`Failed to add web page ${url}:`, error)
         // Continue with other URLs even if one fails
       }
@@ -176,7 +179,8 @@ export class WebPageService {
   extractDomain(url: string): string {
     try {
       return new URL(url).hostname
-    } catch { // Ignored 
+    } catch (error) { 
+      console.error('Failed to extract domain from URL:', url, error)
       return 'unknown'
     }
   }

@@ -93,7 +93,7 @@ export const useAuthStore = create<AuthStore>()(
 
           set({ isLoading: false });
           return { success: false, error: 'Authentication failed' };
-        } catch { // Ignored 
+        } catch (error) { 
           set({ isLoading: false });
           return { 
             success: false, 
@@ -129,7 +129,7 @@ export const useAuthStore = create<AuthStore>()(
 
           set({ isLoading: false });
           return { success: false, error: 'Sign up failed' };
-        } catch { // Ignored 
+        } catch (error) { 
           set({ isLoading: false });
           return { 
             success: false, 
@@ -148,7 +148,7 @@ export const useAuthStore = create<AuthStore>()(
             isAuthenticated: false,
             isLoading: false,
           });
-        } catch { // Ignored 
+        } catch (error) { 
           console.error('Error signing out:', error);
           set({ isLoading: false });
         }
@@ -185,7 +185,7 @@ export const useAuthStore = create<AuthStore>()(
 
           set({ profile: data });
           return { success: true };
-        } catch { // Ignored 
+        } catch (error) { 
           return {
             success: false,
             error: error instanceof Error ? error.message : 'Update failed'
@@ -210,7 +210,7 @@ export const useAuthStore = create<AuthStore>()(
           }
 
           set({ profile: data });
-        } catch { // Ignored 
+        } catch (error) { 
           console.error('Error refreshing profile:', error);
         }
       },
@@ -250,7 +250,7 @@ export const useAuthStore = create<AuthStore>()(
             isAuthenticated: true,
             isLoading: false,
           });
-        } catch { // Ignored 
+        } catch (error) { 
           console.error('Error initializing auth:', error);
           set({
             profile: null,

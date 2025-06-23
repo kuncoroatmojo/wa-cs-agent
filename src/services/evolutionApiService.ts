@@ -137,7 +137,7 @@ export class EvolutionApiService {
     try {
       const response = await this.makeRequest('/instance/fetchInstances', 'GET');
       return response.ok;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Evolution API not accessible:', error);
       return false;
     }
@@ -177,7 +177,7 @@ export class EvolutionApiService {
         headers: this.headers
       });
       return response.data.instances || [];
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error fetching instances:', error);
       return [];
     }
@@ -208,14 +208,14 @@ export class EvolutionApiService {
       // Set up the webhook
       try {
         await this.setupWebhook(instanceName, webhookUrl);
-      } catch { // Ignored 
+      } catch (error) { 
         console.error('❌ Failed to set up webhook:', webhookError);
         // Don't throw here, we want to return the instance even if webhook setup fails
       }
 
       // Return the instance
       return instance;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to create Evolution API instance:', error);
       throw error;
     }
@@ -233,7 +233,7 @@ export class EvolutionApiService {
       await conversationService.deleteInstanceConversations(instanceName);
 
       return true;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error(`Error deleting instance ${instanceName}:`, error);
       return false;
     }
@@ -244,7 +244,7 @@ export class EvolutionApiService {
     try {
       const response = await this.makeRequest(`/instance/connectionState/${instanceName}`, 'GET');
       return await response.json();
-    } catch { // Ignored 
+    } catch (error) { 
       console.error(`Failed to get state for instance ${instanceName}:`, error);
       return null;
     }
@@ -260,7 +260,7 @@ export class EvolutionApiService {
         return result.qrcode;
       }
       return null;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error(`Failed to get QR code for instance ${instanceName}:`, error);
       return null;
     }
@@ -298,7 +298,7 @@ export class EvolutionApiService {
       }
 
       return await response.json();
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to send text message:', error);
       throw error;
     }
@@ -313,7 +313,7 @@ export class EvolutionApiService {
       const status = await statusResponse.json();
       
       return status;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error testing endpoints:', error);
       return null;
     }
@@ -361,7 +361,7 @@ export class EvolutionApiService {
       }));
 
       return mappedChats;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to fetch chats:', error);
       return [];
     }
@@ -403,7 +403,7 @@ export class EvolutionApiService {
       }
 
       return messages || [];
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error loading conversation messages:', error);
       return [];
     }
@@ -450,11 +450,11 @@ export class EvolutionApiService {
         
         return processedMessages;
 
-      } catch { // Ignored 
+      } catch (error) { 
         console.error(`Failed to fetch messages for instance ${instanceName}:`, error);
         return [];
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to load all messages:', error);
       return [];
     }
@@ -499,7 +499,7 @@ export class EvolutionApiService {
       });
 
       return response.ok ? await response.json() : [];
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error fetching messages:', error);
       return [];
     }
@@ -552,7 +552,7 @@ export class EvolutionApiService {
         throw error;
       }
 
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error in syncMessagesWithDatabase:', error);
       throw error;
     }
@@ -569,7 +569,7 @@ export class EvolutionApiService {
       const contactInfo = await response.json();
       
       return contactInfo;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error(`Failed to fetch contact info for ${remoteJid}:`, error);
       return null;
     }
@@ -719,7 +719,7 @@ export class EvolutionApiService {
                         if (directContactInfo?.name || directContactInfo?.pushName) {
                           contactName = (directContactInfo.name || directContactInfo.pushName).trim();
                         }
-                      } catch { // Ignored 
+                      } catch (error) { 
                       }
                     }
                     
@@ -752,7 +752,7 @@ export class EvolutionApiService {
                       lastMessagePreview: lastMessageText,
                       remoteJid: remoteJid
                     };
-                  } catch { // Ignored 
+                  } catch (error) { 
                     console.error(`Error processing conversation ${remoteJid}:`, error);
                     return null;
                   }
@@ -763,7 +763,7 @@ export class EvolutionApiService {
               instanceName: instance.name || instance.instance_key,
               conversations
             };
-          } catch { // Ignored 
+          } catch (error) { 
             console.error(`Failed to fetch conversations for instance ${instance.instance_key}:`, error);
             return {
               instanceName: instance.name || instance.instance_key,
@@ -774,7 +774,7 @@ export class EvolutionApiService {
       );
 
       return allConversations;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to fetch all conversations:', error);
       return [];
     }
@@ -854,7 +854,7 @@ export class EvolutionApiService {
         }
       }
 
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Failed to sync instances with database:', error);
       throw error;
     }
@@ -896,7 +896,7 @@ export class EvolutionApiService {
         qrCode,
         state
       };
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to get instance info:', error);
       return {
         instance: null,
@@ -944,7 +944,7 @@ export class EvolutionApiService {
           
           return; // Success, exit the retry loop
           
-        } catch { // Ignored 
+        } catch (error) { 
           lastError = error;
           if (i < retries - 1) {
             // Wait longer between each retry
@@ -956,7 +956,7 @@ export class EvolutionApiService {
       // If we get here, all retries failed
       throw lastError || new Error('Failed to set up webhook after all retries');
 
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error setting up webhook:', error);
       throw error;
     }
@@ -971,7 +971,7 @@ export class EvolutionApiService {
 
       const instances = await this.fetchInstances();
       return { success: true, instances };
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to test Evolution API connection:', error);
       return { 
         success: false, 
@@ -1002,7 +1002,7 @@ export class EvolutionApiService {
       await this.setupWebhook(instanceName, webhookUrl);
       
       return true;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error verifying/fixing webhook:', error);
       return false;
     }
@@ -1020,7 +1020,7 @@ export class EvolutionApiService {
         await this.verifyAndFixWebhook(instance.instanceName);
       }
       
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error verifying all webhooks:', error);
       throw error;
     }

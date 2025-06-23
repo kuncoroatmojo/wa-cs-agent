@@ -98,7 +98,7 @@ export class RAGService {
         source_type: item.source_type,
         metadata: item.metadata || {}
       }))
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error in semantic search:', error)
       return []
     }
@@ -184,7 +184,7 @@ export class RAGService {
         responseTimeMs,
         ragContext: ragContextData
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error generating contextual response:', error)
       
       // Fallback response
@@ -441,7 +441,7 @@ export class RAGService {
 
       const data = await response.json()
       return data.data[0]?.embedding || null
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error generating embedding:', error)
       return null
     }
@@ -540,7 +540,7 @@ export class RAGService {
       }
 
       return data
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error in getActiveAIConfig:', error)
       return null
     }
@@ -590,7 +590,7 @@ Response format:
         context_used: ragContext.contextUsed,
         retrieval_query: ragContext.retrievalQuery
       })
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error storing RAG context:', error)
     }
   }
@@ -624,7 +624,7 @@ Response format:
         topics,
         sentiment
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error in getConversationContext:', error)
       return this.getDefaultConversationContext()
     }

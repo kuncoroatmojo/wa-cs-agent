@@ -74,7 +74,7 @@ export const Integrations: React.FC = () => {
       setLoading(true)
       const data = await integrationService.getExternalIntegrations(profile!.id)
       setIntegrations(data)
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error loading integrations:', error)
     } finally {
       setLoading(false)
@@ -89,7 +89,7 @@ export const Integrations: React.FC = () => {
       } else {
         alert('Integration test failed. Please check your configuration.')
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error testing integration:', error)
       alert('Error testing integration')
     }
@@ -99,7 +99,7 @@ export const Integrations: React.FC = () => {
     try {
       await integrationService.toggleExternalIntegration(integrationId, isActive)
       await loadIntegrations()
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error toggling integration:', error)
     }
   }
@@ -373,7 +373,7 @@ const CreateIntegrationModal: React.FC<{
       })
 
       onCreated()
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error creating integration:', error)
     } finally {
       setLoading(false)
@@ -489,7 +489,7 @@ const EditIntegrationModal: React.FC<{
       })
 
       onUpdated()
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error updating integration:', error)
     } finally {
       setLoading(false)
@@ -503,7 +503,7 @@ const EditIntegrationModal: React.FC<{
       setLoading(true)
       await integrationService.deleteExternalIntegration(integration.id)
       onUpdated()
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error deleting integration:', error)
     } finally {
       setLoading(false)

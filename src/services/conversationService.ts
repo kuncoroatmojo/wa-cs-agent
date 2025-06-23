@@ -126,7 +126,7 @@ export class ConversationService {
         const { latest_message, ...cleanConv } = conv;
         return cleanConv;
       });
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error in getAllConversations:', error);
       throw error;
     }
@@ -213,7 +213,7 @@ export class ConversationService {
       });
 
       return data as UnifiedMessage[];
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error in getConversationMessages:', error);
       throw error;
     }
@@ -270,7 +270,7 @@ export class ConversationService {
       }
 
       return data;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error in upsertConversation:', error);
       throw error;
     }
@@ -343,13 +343,13 @@ export class ConversationService {
 
           await this.upsertConversation(conversation);
           syncedCount++;
-        } catch { // Ignored 
+        } catch (error) { 
           console.error(`❌ Error syncing conversation ${evConv.contactPhone}:`, error);
         }
       }
 
       return syncedCount;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error in syncWhatsAppConversations:', error);
       throw error;
     }
@@ -365,7 +365,7 @@ export class ConversationService {
       let messages: any[] = [];
       try {
         messages = await evolutionApiService.loadConversationMessages(externalConversationId, instanceKey);
-      } catch { // Ignored 
+      } catch (error) { 
         console.error('❌ Failed to sync messages from Evolution API:', error?.message || error);
         // Return 0 to indicate no messages were synced, but don't throw
         // This allows the app to continue working with local messages if Evolution API is temporarily unavailable
@@ -431,7 +431,7 @@ export class ConversationService {
               syncedCount++;
             }
           }
-        } catch { // Ignored 
+        } catch (error) { 
           console.error('❌ Error processing message:', error?.message || error);
           errors.push(error?.message || 'Unknown error processing message');
           continue;
@@ -442,7 +442,7 @@ export class ConversationService {
       }
 
       return syncedCount;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Failed to sync messages:', error?.message || error);
       throw error;
     }
@@ -494,7 +494,7 @@ export class ConversationService {
       };
 
       return await this.addMessage(unifiedMessage);
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error in sendMessage:', error);
       throw error;
     }
@@ -513,7 +513,7 @@ export class ConversationService {
         phoneNumber,
         content
       );
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error sending WhatsApp message:', error);
       throw error;
     }
@@ -533,7 +533,7 @@ export class ConversationService {
       }).join('\n');
 
       return context;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error getting conversation context for RAG:', error);
       return '';
     }
@@ -558,7 +558,7 @@ export class ConversationService {
         console.error('❌ Error updating conversation RAG data:', error);
         throw error;
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error in updateConversationRAGData:', error);
       throw error;
     }
@@ -581,7 +581,7 @@ export class ConversationService {
       }
 
       return data;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error in createSyncEvent:', error);
       throw error;
     }
@@ -620,7 +620,7 @@ export class ConversationService {
             .eq('id', event.id);
 
           processedCount++;
-        } catch { // Ignored 
+        } catch (error) { 
           console.error(`❌ Error processing sync event ${event.id}:`, error);
           
           // Update retry count and error message
@@ -635,7 +635,7 @@ export class ConversationService {
       }
 
       return processedCount;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error in processPendingSyncEvents:', error);
       throw error;
     }
@@ -730,7 +730,7 @@ export class ConversationService {
 
       const archivedCount = data?.length || 0;
       return archivedCount;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error in archiveInstanceConversations:', error);
       throw error;
     }
@@ -777,7 +777,7 @@ export class ConversationService {
 
       const deletedCount = data?.length || 0;
       return deletedCount;
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error in deleteInstanceConversations:', error);
       throw error;
     }
@@ -858,7 +858,7 @@ export class ConversationService {
 
           totalConversations += count || 0;
 
-        } catch { // Ignored 
+        } catch (error) { 
           const errorMsg = `Error syncing instance ${instance.instance_key}: ${error.message}`;
           console.error('❌', errorMsg);
           errors.push(errorMsg);
@@ -877,7 +877,7 @@ export class ConversationService {
         errors
       };
 
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error in syncAllMessagesForRAG:', error);
       throw error;
     }
@@ -912,7 +912,7 @@ export class ConversationService {
         messages: messagesResult.messages as UnifiedMessage[],
         conversationContext: contextResult
       };
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Error getting messages for RAG:', error);
       
       // Fallback to basic conversation messages

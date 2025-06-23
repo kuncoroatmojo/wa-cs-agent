@@ -96,7 +96,7 @@ export class PerformanceService {
       this.setCachedData(cacheKey, metrics)
       
       return metrics
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error fetching performance metrics:', error)
       return this.getDefaultMetrics()
     }
@@ -191,7 +191,7 @@ export class PerformanceService {
         recommendations,
         lastChecked: new Date().toISOString()
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error checking system health:', error)
       return {
         status: 'critical',
@@ -270,7 +270,7 @@ export class PerformanceService {
         const priorityOrder = { high: 3, medium: 2, low: 1 }
         return priorityOrder[b.priority] - priorityOrder[a.priority]
       })
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error getting optimization suggestions:', error)
       return []
     }
@@ -309,7 +309,7 @@ export class PerformanceService {
         results,
         errors
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error running optimization:', error)
       return {
         success: false,
@@ -327,7 +327,7 @@ export class PerformanceService {
       try {
         const metrics = await this.getPerformanceMetrics()
         callback(metrics)
-      } catch { // Ignored 
+      } catch (error) { 
         console.error('Error in performance monitoring:', error)
       }
     }, 30000) // Update every 30 seconds
@@ -359,7 +359,7 @@ export class PerformanceService {
       const trends = this.analyzeTrends(timeline)
 
       return { timeline, trends }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error fetching performance trends:', error)
       return {
         timeline: [],
@@ -398,7 +398,7 @@ export class PerformanceService {
         },
         cacheHitRate: 85
       }
-    } catch { // Ignored 
+    } catch (error) { 
       return {
         connectionCount: 0,
         queryPerformance: {
@@ -445,7 +445,7 @@ export class PerformanceService {
         errorRate: 0.2, // Would calculate from actual error logs
         apiLatency: Math.round(averageResponseTime * 0.7) // Estimate API latency as portion of total time
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error fetching AI metrics:', error)
       return {
         averageResponseTime: 0,
@@ -476,7 +476,7 @@ export class PerformanceService {
         embeddingGenerationTime: 200, // Would measure actual embedding time
         contextRetrievalSuccess: contexts.length > 0 ? (successfulRetrievals / contexts.length) * 100 : 0
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error fetching RAG metrics:', error)
       return {
         averageSearchTime: 0,
@@ -510,7 +510,7 @@ export class PerformanceService {
         implementation: 'CREATE INDEX idx_active_sessions ON chat_sessions(user_id, last_message_at) WHERE is_active = true',
         estimatedGain: '20-30% faster session queries'
       })
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error analyzing index needs:', error)
     }
 
@@ -530,7 +530,7 @@ export class PerformanceService {
         description: 'Cleaned up old data',
         impact: `Removed old records: ${JSON.stringify(cleanupResults)}`
       })
-    } catch { // Ignored 
+    } catch (error) { 
       errors.push(`Data cleanup failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
@@ -545,7 +545,7 @@ export class PerformanceService {
         description: 'Updated table statistics',
         impact: 'Improved query planning and performance'
       })
-    } catch { // Ignored 
+    } catch (error) { 
       errors.push(`Index optimization failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
@@ -560,7 +560,7 @@ export class PerformanceService {
         description: 'Cleared performance metrics cache',
         impact: 'Fresh metrics will be loaded on next request'
       })
-    } catch { // Ignored 
+    } catch (error) { 
       errors.push(`Cache optimization failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }

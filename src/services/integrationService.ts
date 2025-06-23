@@ -37,7 +37,7 @@ export class IntegrationService {
       await supabase.functions.invoke('whatsapp-connect', {
         body: { integration_id: data.id }
       })
-    } catch { // Ignored 
+    } catch (error) { 
     }
 
     return data
@@ -64,7 +64,7 @@ export class IntegrationService {
       await supabase.functions.invoke('whatsapp-disconnect', {
         body: { integration_id: integrationId }
       })
-    } catch { // Ignored 
+    } catch (error) { 
     }
 
     const { error } = await supabase
@@ -84,7 +84,7 @@ export class IntegrationService {
       await supabase.functions.invoke('whatsapp-connect', {
         body: { integration_id: integrationId }
       })
-    } catch { // Ignored 
+    } catch (error) { 
       await this.updateWhatsAppIntegration(integrationId, {
         status: 'error'
       })
@@ -99,7 +99,7 @@ export class IntegrationService {
       await supabase.functions.invoke('whatsapp-disconnect', {
         body: { integration_id: integrationId }
       })
-    } catch { // Ignored 
+    } catch (error) { 
     }
 
     return this.updateWhatsAppIntegration(integrationId, {
@@ -193,7 +193,7 @@ export class IntegrationService {
 
       if (error) return false
       return data.success || false
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Error testing external integration:', error)
       return false
     }
@@ -332,7 +332,7 @@ export class IntegrationService {
       )
 
       return provider
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to create messaging provider:', error)
       throw error
     }
@@ -352,7 +352,7 @@ export class IntegrationService {
       }
 
       return await provider.sendMessage(options)
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to send message:', error)
       return false
     }
@@ -369,7 +369,7 @@ export class IntegrationService {
       }
 
       return await provider.getStatus()
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to get provider status:', error)
       return { 
         status: 'error', 
@@ -385,7 +385,7 @@ export class IntegrationService {
     try {
       const provider = await this.createMessagingProvider(integration)
       return await provider.connect()
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to connect provider:', error)
       return { 
         status: 'error' as const, 
@@ -404,7 +404,7 @@ export class IntegrationService {
         await provider.disconnect()
       }
       MessagingProviderFactory.removeProvider(integrationId)
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to disconnect provider:', error)
     }
   }
@@ -424,7 +424,7 @@ export class IntegrationService {
       }
 
       return await provider.processWebhook(webhookData)
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to process webhook:', error)
       return null
     }

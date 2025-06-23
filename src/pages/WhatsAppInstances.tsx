@@ -238,7 +238,7 @@ const WhatsAppInstances: React.FC = () => {
                 } else {
                 }
                 
-              } catch { // Ignored 
+              } catch (error) { 
                 console.error('Error monitoring connection:', error);
                 if (attempts < maxAttempts) {
                   setTimeout(checkStatus, 5000);
@@ -271,7 +271,7 @@ const WhatsAppInstances: React.FC = () => {
           alert('WhatsApp connection initiated in demo mode! A QR code has been generated. The instance will automatically connect after 8 seconds for demonstration purposes.');
         }
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to connect WhatsApp instance:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
       setError(`Failed to connect: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -323,7 +323,7 @@ const WhatsAppInstances: React.FC = () => {
         });
       }
       
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('❌ Failed to sync conversations and messages:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to sync conversations and messages';
       
@@ -354,7 +354,7 @@ const WhatsAppInstances: React.FC = () => {
       } else {
         toast.error(`Failed to delete instance: ${result.error}`);
       }
-    } catch { // Ignored 
+    } catch (error) { 
       toast.error('Failed to delete instance');
       console.error('Error deleting instance:', error);
     }
@@ -372,7 +372,7 @@ const WhatsAppInstances: React.FC = () => {
       } else {
         toast.error(`Failed to cleanup instances: ${result.error}`);
       }
-    } catch { // Ignored 
+    } catch (error) { 
       toast.error('Failed to cleanup instances');
       console.error('Error during cleanup:', error);
     }

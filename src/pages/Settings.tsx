@@ -161,7 +161,7 @@ const Settings: React.FC = () => {
       if (result.success) {
         setEvolutionError(null);
       }
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to save config:', error);
       setEvolutionError(error instanceof Error ? error.message : 'Failed to save configuration');
     }
@@ -182,7 +182,7 @@ const Settings: React.FC = () => {
       await createEvolutionInstance(newInstanceName);
       setNewInstanceName('');
       setEvolutionError(null);
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to create instance:', error);
     }
   };
@@ -195,7 +195,7 @@ const Settings: React.FC = () => {
     try {
       await deleteEvolutionInstance(instanceName);
       setEvolutionError(null);
-    } catch { // Ignored 
+    } catch (error) { 
       console.error('Failed to delete instance:', error);
     }
   };
