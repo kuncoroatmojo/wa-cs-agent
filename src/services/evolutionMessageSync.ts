@@ -67,7 +67,6 @@ export class EvolutionMessageSyncService {
   private initialize() {
     if (this.initialized) return;
 
-    console.log('🔧 Initializing Evolution Message Sync Service...');
 
     // Get Supabase credentials from environment
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -96,7 +95,6 @@ export class EvolutionMessageSyncService {
       throw new Error('Evolution API credentials not configured');
     }
 
-    console.log('✅ Evolution Message Sync Service initialized successfully');
     console.log('  - Evolution API URL:', this.evolutionApiUrl);
     console.log('  - Evolution API Key:', this.evolutionApiKey.substring(0, 8) + '...');
     
@@ -348,10 +346,8 @@ export class EvolutionMessageSyncService {
       const duration = Math.round((progress.endTime.getTime() - progress.startTime.getTime()) / 1000);
       const avgMsgPerSec = Math.round(progress.processedMessages / duration);
 
-      console.log(`   • Conversations: ${progress.processedConversations}/${progress.totalConversations} processed`);
 
       if (progress.errors.length > 0) {
-        console.warn(`Sync completed with ${progress.errors.length} errors`);
       }
 
     } catch (error) { 
@@ -594,7 +590,6 @@ export class EvolutionMessageSyncService {
       
       // Progress update for large conversations
       if (newMessages.length > 100 && processedCount % 100 === 0) {
-        console.log(`Processed ${processedCount}/${newMessages.length} messages for conversation ${remoteJid}`);
       }
     }
 
