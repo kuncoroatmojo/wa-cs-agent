@@ -55,11 +55,20 @@ interface SyncProgress {
 }
 
 export class EvolutionMessageSyncService {
-  private supabase;
-  private evolutionApiUrl: string;
-  private evolutionApiKey: string;
+  private supabase: any;
+  private evolutionApiUrl: string | null = null;
+  private evolutionApiKey: string | null = null;
+  private initialized = false;
 
   constructor() {
+    // Don't initialize immediately - wait for first method call
+  }
+
+  private initialize() {
+    if (this.initialized) return;
+
+    console.log('🔧 Initializing Evolution Message Sync Service...');
+
     // Get Supabase credentials from environment
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY || 
@@ -67,6 +76,9 @@ export class EvolutionMessageSyncService {
                               process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('❌ Supabase credentials not configured:');
+      console.error('  - VITE_SUPABASE_URL:', !!supabaseUrl);
+      console.error('  - SUPABASE_SERVICE_ROLE_KEY:', !!supabaseServiceKey);
       throw new Error('Supabase credentials not configured');
     }
 
@@ -75,19 +87,32 @@ export class EvolutionMessageSyncService {
     this.evolutionApiKey = import.meta.env.VITE_EVOLUTION_API_KEY || '';
 
     if (!this.evolutionApiUrl || !this.evolutionApiKey) {
+      console.error('❌ Evolution API credentials not configured:');
+      console.error('  - VITE_EVOLUTION_API_URL:', !!this.evolutionApiUrl);
+      console.error('  - VITE_EVOLUTION_API_KEY:', !!this.evolutionApiKey);
+      console.error('Please ensure your .env.local file contains:');
+      console.error('  VITE_EVOLUTION_API_URL=your-evolution-api-url');
+      console.error('  VITE_EVOLUTION_API_KEY=your-evolution-api-key');
       throw new Error('Evolution API credentials not configured');
     }
+
+    console.log('✅ Evolution Message Sync Service initialized successfully');
+    console.log('  - Evolution API URL:', this.evolutionApiUrl);
+    console.log('  - Evolution API Key:', this.evolutionApiKey.substring(0, 8) + '...');
+    
+    this.initialized = true;
   }
 
   /**
    * Fetch all chats from Evolution API
    */
   async fetchAllChatsFromEvolution(instanceName: string): Promise<EvolutionChat[]> {
+    this.initialize();
     
     const response = await fetch(`${this.evolutionApiUrl}/chat/findChats/${instanceName}`, {
       method: 'GET',
       headers: {
-        'apikey': this.evolutionApiKey,
+        'apikey': this.evolutionApiKey!,
         'Content-Type': 'application/json'
       }
     });
@@ -105,11 +130,12 @@ export class EvolutionMessageSyncService {
    * Uses the correct POST endpoint with empty body to get ALL messages
    */
   async fetchAllMessagesFromEvolution(instanceName: string): Promise<EvolutionMessage[]> {
+    this.initialize();
     
     const response = await fetch(`${this.evolutionApiUrl}/chat/findMessages/${instanceName}`, {
       method: 'POST',
       headers: {
-        'apikey': this.evolutionApiKey,
+        'apikey': this.evolutionApiKey!,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({}) // Empty body to get all messages
@@ -128,11 +154,12 @@ export class EvolutionMessageSyncService {
    * Fetch messages for a specific conversation
    */
   async fetchConversationMessages(instanceName: string, remoteJid: string): Promise<EvolutionMessage[]> {
+    this.initialize();
     
     const response = await fetch(`${this.evolutionApiUrl}/chat/findMessages/${instanceName}`, {
       method: 'POST',
       headers: {
-        'apikey': this.evolutionApiKey,
+        'apikey': this.evolutionApiKey!,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -224,6 +251,8 @@ export class EvolutionMessageSyncService {
    * Sync all messages for a specific instance
    */
   async syncAllMessages(instanceName: string): Promise<SyncProgress> {
+    this.initialize();
+    
     const progress: SyncProgress = {
       totalMessages: 0,
       processedMessages: 0,
@@ -626,6 +655,8 @@ export class EvolutionMessageSyncService {
     includeHistorical?: boolean;
     textOnly?: boolean;
   } = {}): Promise<any[]> {
+    this.initialize();
+    
     let query = this.supabase
       .from('conversation_messages')
       .select(`
@@ -703,6 +734,8 @@ export class EvolutionMessageSyncService {
       keyTopics?: string[];
     };
   }> {
+    this.initialize();
+    
     // Get conversation
     const { data: conversation } = await this.supabase
       .from('conversations')
@@ -785,6 +818,8 @@ export class EvolutionMessageSyncService {
     totalMessages: number;
     lastSyncTime?: Date;
   }> {
+    this.initialize();
+    
     // Get total conversations
     const { count: conversationCount } = await this.supabase
       .from('conversations')
@@ -818,6 +853,21 @@ export class EvolutionMessageSyncService {
   }
 }
 
-// Export default instance for easy importing
-export const evolutionMessageSync = new EvolutionMessageSyncService();
+// Factory function for lazy initialization
+let _instance: EvolutionMessageSyncService | null = null;
+
+export function getEvolutionMessageSyncService(): EvolutionMessageSyncService {
+  if (!_instance) {
+    _instance = new EvolutionMessageSyncService();
+  }
+  return _instance;
+}
+
+// Export default instance for easy importing (lazy initialized)
+export const evolutionMessageSync = {
+  get instance() {
+    return getEvolutionMessageSyncService();
+  }
+};
+
 export default evolutionMessageSync; 

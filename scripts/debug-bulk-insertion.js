@@ -1,10 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
+import dotenv from 'dotenv';
 
-const SUPABASE_URL = 'https://pfirjlhuulkchogjbvsv.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmaXJqbGh1dWxrY2hvZ2pidnN2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNDIwNzE0NywiZXhwIjoyMDQ5NzgzMTQ3fQ.nSqBAT-BhNBuXW6EHn6mPf5D9VQDe1b0tEiMPmJJH7Q';
-const EVOLUTION_API_URL = 'https://evo.istn.ac.id';
-const EVOLUTION_API_KEY = 'YGyPcZ5tn8RfmaATbP5ou9bOP4Usc7Pk4G0k04p9G7iNMpWqbNhga2FOl6T7ud26';
+// Load environment variables
+dotenv.config();
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://pfirjlhuulkchogjbvsv.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const EVOLUTION_API_URL = process.env.VITE_EVOLUTION_API_URL;
+const EVOLUTION_API_KEY = process.env.VITE_EVOLUTION_API_KEY;
+
+if (!SUPABASE_SERVICE_ROLE_KEY || !EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
+  console.error('❌ Missing required environment variables:');
+  console.error('  - SUPABASE_SERVICE_ROLE_KEY');
+  console.error('  - VITE_EVOLUTION_API_URL');
+  console.error('  - VITE_EVOLUTION_API_KEY');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 

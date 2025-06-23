@@ -1,34 +1,26 @@
 # Environment Variables Configuration
 
-## Updated Environment Variable Names
+## Simplified Environment Variable Configuration
 
-We've updated the Evolution API environment variable configuration to use a cleaner naming convention:
+We've simplified the Evolution API environment variable configuration to use only `VITE_EVOLUTION_API_KEY` for consistency across both frontend and backend code.
 
-### Client-Side Variables (Frontend)
-These variables are used in the React application (src/ files) and **must** have the `VITE_` prefix to be accessible in the browser:
+### Environment Variables Used
 
-- `VITE_EVOLUTION_API_URL` - Evolution API base URL (accessible in browser)
-- `VITE_EVOLUTION_API_KEY` - Evolution API key (accessible in browser)
+All code (frontend, backend, and scripts) now uses the same environment variable names:
 
-### Server-Side Variables (Scripts & Functions)
-These variables are used in Node.js scripts and server functions:
-
-- `VITE_EVOLUTION_API_URL` - Evolution API base URL (used for consistency)
-- `EVOLUTION_API_KEY` - Evolution API key (cleaner name for server-side scripts)
+- `VITE_EVOLUTION_API_URL` - Evolution API base URL (used everywhere)
+- `VITE_EVOLUTION_API_KEY` - Evolution API key (used everywhere)
 
 ## Environment File Setup
 
-Your `.env` file should contain:
+Your `.env` or `.env.local` file should contain:
 
 ```env
-# Required for both client-side and server-side access
+# Evolution API Configuration (used for both frontend and scripts)
 VITE_EVOLUTION_API_URL=https://your-evolution-api-url.com
 VITE_EVOLUTION_API_KEY=your-api-key
 
-# Required for server-side scripts (cleaner variable name)
-EVOLUTION_API_KEY=your-api-key
-
-# Other variables
+# Supabase Configuration
 VITE_SUPABASE_URL=your-supabase-url
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
@@ -45,16 +37,16 @@ const apiKey = import.meta.env.VITE_EVOLUTION_API_KEY;
 
 ### In Node.js Scripts (scripts/)
 ```javascript
-// Use cleaner variable names for server-side
+// Use the same VITE_ variables for consistency
 const EVOLUTION_API_URL = process.env.VITE_EVOLUTION_API_URL;
-const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
+const EVOLUTION_API_KEY = process.env.VITE_EVOLUTION_API_KEY;
 ```
 
 ## Summary of Changes
 
-✅ **Frontend (src/)**: Uses `VITE_EVOLUTION_API_URL` and `VITE_EVOLUTION_API_KEY` (no changes)
-✅ **Scripts**: Updated to use `EVOLUTION_API_KEY` instead of `VITE_EVOLUTION_API_KEY`
-✅ **URL Variable**: Scripts continue to use `VITE_EVOLUTION_API_URL` for consistency
-✅ **Backward Compatibility**: Existing deployments will continue to work
+✅ **Simplified Configuration**: All code now uses `VITE_EVOLUTION_API_KEY`
+✅ **Frontend (src/)**: Uses `VITE_EVOLUTION_API_URL` and `VITE_EVOLUTION_API_KEY`
+✅ **Scripts**: Updated to use `VITE_EVOLUTION_API_KEY` for consistency
+✅ **No Duplication**: Single variable means no confusion
 
-This approach provides cleaner script code while maintaining full frontend compatibility.
+This approach provides consistency across the entire codebase while maintaining full frontend compatibility.

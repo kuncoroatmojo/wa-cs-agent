@@ -6,7 +6,7 @@
 
 import { supabase as supabaseClient } from '../lib/supabase';
 import { evolutionApiService } from './evolutionApiService';
-import { evolutionMessageSync } from './evolutionMessageSync';
+import { getEvolutionMessageSyncService } from './evolutionMessageSync';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { UnifiedMessage } from '../types';
 import type { Database } from '../types/database';
@@ -838,7 +838,7 @@ export class ConversationService {
           }
 
           // Use the evolution message sync service
-          const syncResult = await evolutionMessageSync.syncAllMessages(
+          const syncResult = await getEvolutionMessageSyncService().syncAllMessages(
             instance.instance_key
           );
 
@@ -905,8 +905,8 @@ export class ConversationService {
   }> {
     try {
       // Use the evolution message sync service for advanced filtering
-      const messagesResult = await evolutionMessageSync.getMessagesForRAG(conversationId, options);
-      const contextResult = await evolutionMessageSync.getConversationContext(conversationId);
+      const messagesResult = await getEvolutionMessageSyncService().getMessagesForRAG(conversationId, options);
+      const contextResult = await getEvolutionMessageSyncService().getConversationContext(conversationId);
 
       return {
         messages: messagesResult.messages as UnifiedMessage[],
@@ -937,7 +937,7 @@ export class ConversationService {
    * Get sync progress for an instance
    */
   getSyncProgress(instanceKey: string) {
-    return evolutionMessageSync.getSyncProgress(instanceKey);
+    return getEvolutionMessageSyncService().getSyncProgress(instanceKey);
   }
 }
 
