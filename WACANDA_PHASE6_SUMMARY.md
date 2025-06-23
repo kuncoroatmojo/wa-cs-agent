@@ -144,15 +144,16 @@
 #### **Environment Variables**:
 ```bash
 # Production Configuration
-VITE_SUPABASE_URL=https://prod.supabase.co
-VITE_SUPABASE_ANON_KEY=prod_anon_key
-VITE_ENVIRONMENT=production
-VITE_SENTRY_DSN=production_sentry_dsn
+SUPABASE_URL=https://prod.supabase.co
+SUPABASE_ANON_KEY=prod_anon_key
+VITE_EVOLUTION_API_URL=https://prod.evolution-api.com
+VITE_EVOLUTION_API_KEY=prod_api_key
 
 # Staging Configuration  
-VITE_SUPABASE_URL=https://staging.supabase.co
-VITE_SUPABASE_ANON_KEY=staging_anon_key
-VITE_ENVIRONMENT=staging
+SUPABASE_URL=https://staging.supabase.co
+SUPABASE_ANON_KEY=staging_anon_key
+VITE_EVOLUTION_API_URL=https://staging.evolution-api.com
+VITE_EVOLUTION_API_KEY=staging_api_key
 ```
 
 ### 3. **Deployment Configuration**

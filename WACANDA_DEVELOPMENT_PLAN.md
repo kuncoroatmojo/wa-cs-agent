@@ -476,8 +476,8 @@ serve(async (req) => {
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../types/database'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!
+const supabaseUrl = import.meta.env.SUPABASE_URL!
+const supabaseAnonKey = import.meta.env.SUPABASE_ANON_KEY!
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
 
@@ -1347,8 +1347,8 @@ export class HandoffService {
 **Environment Configuration**:
 ```bash
 # .env.production
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
 VITE_APP_VERSION=1.0.0
 VITE_ENVIRONMENT=production
 VITE_SENTRY_DSN=your-sentry-dsn

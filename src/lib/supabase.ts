@@ -1,43 +1,30 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../types/database';
+import type { Database as SupabaseDatabase } from '../types/database';
 
 // Environment variables - these should be set in your .env file
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Better error handling for missing environment variables
 if (!supabaseUrl) {
-  console.warn('VITE_SUPABASE_URL is not set. Using placeholder for development.');
 }
 
 if (!supabaseAnonKey) {
-  console.warn('VITE_SUPABASE_ANON_KEY is not set. Using placeholder for development.');
+}
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables');
 }
 
 // Create Supabase client with fallback for development
-export const supabase = createClient<Database>(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseAnonKey || 'placeholder-key',
-  {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true
-    },
-    realtime: {
-      params: {
-        eventsPerSecond: 10
-      }
-    }
-  }
-);
+export const supabase = createClient<SupabaseDatabase>(supabaseUrl, supabaseAnonKey);
 
 // Auth helpers
 export const auth = supabase.auth;
 
 // Real-time subscriptions helper
 export const subscribeToTable = (
-  table: keyof Database['public']['Tables'],
+  table: keyof SupabaseDatabase['public']['Tables'],
   callback: (payload: any) => void,
   filter?: string
 ) => {

@@ -20,7 +20,8 @@ export interface WhatsAppInstance {
   id: string;
   name: string;
   status: 'connected' | 'disconnected' | 'connecting' | 'error';
-  connectionType: 'baileys' | 'cloud_api';
+  connectionType: 'baileys' | 'cloud_api' | 'evolution_api';
+  instanceKey: string;
   phoneNumber?: string;
   qrCode?: string;
   lastSeen?: string;
@@ -73,8 +74,8 @@ export interface Message {
   updated_at?: string;
 }
 
-// RAG and AI Types
-export interface Document {
+// RAG and AI Types - Legacy interface kept for compatibility
+export interface LegacyDocument {
   id: string;
   title: string;
   content: string;
@@ -132,6 +133,8 @@ export interface Conversation {
   createdAt: string;
   updatedAt: string;
   lastMessageAt: string;
+  lastMessagePreview?: string;
+  remoteJid?: string; // Evolution API remote JID for message filtering
 }
 
 // Google Drive Integration Types
@@ -466,4 +469,31 @@ export interface RAGMetrics {
   documents_used: number;
   successful_retrievals: number;
   failed_retrievals: number;
+}
+
+export interface UnifiedMessage {
+  id: string;
+  conversation_id: string;
+  content: string;
+  message_type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'location' | 'contact' | 'sticker' | 'reaction';
+  media_url?: string;
+  media_metadata: Record<string, any>;
+  direction: 'inbound' | 'outbound';
+  sender_type: 'contact' | 'agent' | 'bot';
+  sender_name?: string;
+  sender_id?: string;
+  status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+  ai_processed: boolean;
+  ai_response_time_ms?: number;
+  ai_model_used?: string;
+  ai_confidence_score?: number;
+  ai_tokens_used?: number;
+  external_message_id?: string;
+  external_timestamp?: string;
+  external_metadata: Record<string, any>;
+  rag_context_used?: string;
+  rag_sources?: string[];
+  rag_similarity_scores?: number[];
+  created_at: string;
+  updated_at: string;
 } 

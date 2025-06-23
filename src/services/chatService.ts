@@ -5,10 +5,7 @@ export class ChatService {
   async getSessionsBySender(userId: string): Promise<ChatSession[]> {
     const { data, error } = await supabase
       .from('chat_sessions')
-      .select(`
-        *,
-        messages:chat_messages(*)
-      `)
+      .select('*')
       .eq('user_id', userId)
       .order('last_message_at', { ascending: false })
 
@@ -52,10 +49,7 @@ export class ChatService {
   async getSession(sessionId: string): Promise<ChatSession | null> {
     const { data, error } = await supabase
       .from('chat_sessions')
-      .select(`
-        *,
-        messages:chat_messages(*)
-      `)
+      .select('*')
       .eq('id', sessionId)
       .single()
 
@@ -151,7 +145,7 @@ export class ChatService {
         userMessage,
         aiResponse: aiMessage
       }
-    } catch (error) {
+    } catch { // Ignored 
       // If AI response fails, store an error message
       const errorMessage = await this.sendMessage(
         sessionId,

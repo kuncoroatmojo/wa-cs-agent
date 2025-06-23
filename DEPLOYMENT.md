@@ -10,8 +10,9 @@ Create a `.env` file in your project root with these variables:
 
 ```env
 # Supabase Configuration
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 
 # Evolution API Configuration
 VITE_EVOLUTION_API_URL=https://your-evolution-api.com
@@ -248,8 +249,8 @@ vercel --prod
 ### 4. **Configure Environment Variables in Vercel**
 ```bash
 # Set environment variables in Vercel dashboard or via CLI
-vercel env add VITE_SUPABASE_URL
-vercel env add VITE_SUPABASE_ANON_KEY
+vercel env add SUPABASE_URL
+vercel env add SUPABASE_ANON_KEY
 vercel env add VITE_EVOLUTION_API_URL
 vercel env add VITE_EVOLUTION_API_KEY
 vercel env add VITE_OPENAI_API_KEY

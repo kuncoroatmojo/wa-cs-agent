@@ -1,20 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { useEvolutionApiStore } from '../store/evolutionApiStore';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const Settings: React.FC = () => {
-  const { user } = useAuthStore();
+  const { profile } = useAuthStore();
+  const {
+    config: evolutionConfig,
+    isConfigured: isEvolutionConfigured,
+    instances: evolutionInstances,
+    loading: evolutionLoading,
+    error: evolutionError,
+    setConfig: setEvolutionConfig,
+    testConnection: testEvolutionConnection,
+    fetchInstances: fetchEvolutionInstances,
+    syncInstances: syncEvolutionInstances,
+    createInstance: createEvolutionInstance,
+    deleteInstance: deleteEvolutionInstance,
+    connectInstance: connectEvolutionInstance,
+    disconnectInstance: disconnectEvolutionInstance,
+    setError: setEvolutionError
+  } = useEvolutionApiStore();
   const [activeTab, setActiveTab] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    evolutionApiUrl: '',
-    evolutionApiKey: '',
+    name: profile?.full_name || '',
+    email: profile?.email || '',
+    evolutionApiUrl: evolutionConfig?.baseUrl || '',
+    evolutionApiKey: evolutionConfig?.apiKey || '',
     openaiApiKey: '',
     googleClientId: '',
     webhookUrl: '',
   });
+
+  const [evolutionTestResult, setEvolutionTestResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [newInstanceName, setNewInstanceName] = useState('');
+
+  // Check if environment variables are set
+  const hasEnvConfig = !!(import.meta.env.VITE_EVOLUTION_API_URL && import.meta.env.VITE_EVOLUTION_API_KEY);
+  const isUsingEnvConfig = hasEnvConfig && 
+    evolutionConfig?.baseUrl === import.meta.env.VITE_EVOLUTION_API_URL &&
+    evolutionConfig?.apiKey === import.meta.env.VITE_EVOLUTION_API_KEY;
+
+  useEffect(() => {
+    if (isEvolutionConfigured) {
+      fetchEvolutionInstances();
+    }
+  }, [isEvolutionConfigured, fetchEvolutionInstances]);
 
   const tabs = [
     { id: 'profile', name: 'Profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
@@ -52,7 +84,7 @@ const Settings: React.FC = () => {
           <div className="shrink-0">
             <img
               className="h-16 w-16 object-cover rounded-full"
-              src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=3b82f6&color=fff`}
+              src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.full_name || 'User')}&background=3b82f6&color=fff`}
               alt="Profile"
             />
           </div>
@@ -108,6 +140,81 @@ const Settings: React.FC = () => {
     </div>
   );
 
+  const handleSaveEvolutionConfig = async () => {
+    if (!formData.evolutionApiUrl || !formData.evolutionApiKey) {
+      setEvolutionError('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const newConfig = {
+        baseUrl: formData.evolutionApiUrl.replace(/\/$/, ''), // Remove trailing slash
+        apiKey: formData.evolutionApiKey,
+      };
+
+      setEvolutionConfig(newConfig);
+      
+      // Test the connection
+      const result = await testEvolutionConnection();
+      setEvolutionTestResult(result);
+      
+      if (result.success) {
+        setEvolutionError(null);
+      }
+    } catch { // Ignored 
+      console.error('Failed to save config:', error);
+      setEvolutionError(error instanceof Error ? error.message : 'Failed to save configuration');
+    }
+  };
+
+  const handleTestEvolutionConnection = async () => {
+    const result = await testEvolutionConnection();
+    setEvolutionTestResult(result);
+  };
+
+  const handleCreateEvolutionInstance = async () => {
+    if (!newInstanceName.trim()) {
+      setEvolutionError('Please enter an instance name');
+      return;
+    }
+
+    try {
+      await createEvolutionInstance(newInstanceName);
+      setNewInstanceName('');
+      setEvolutionError(null);
+    } catch { // Ignored 
+      console.error('Failed to create instance:', error);
+    }
+  };
+
+  const handleDeleteEvolutionInstance = async (instanceName: string) => {
+    if (!confirm(`Are you sure you want to delete instance "${instanceName}"?`)) {
+      return;
+    }
+
+    try {
+      await deleteEvolutionInstance(instanceName);
+      setEvolutionError(null);
+    } catch { // Ignored 
+      console.error('Failed to delete instance:', error);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'open':
+        return 'text-green-600 bg-green-100';
+      case 'connecting':
+        return 'text-yellow-600 bg-yellow-100';
+      case 'close':
+      case 'closed':
+      case 'disconnected':
+        return 'text-red-600 bg-red-100';
+      default:
+        return 'text-gray-600 bg-gray-100';
+    }
+  };
+
   const renderApiSettings = () => (
     <div className="space-y-6">
       <div>
@@ -118,42 +225,245 @@ const Settings: React.FC = () => {
       </div>
 
       <div className="space-y-6">
-        {/* Evolution API */}
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h4 className="text-md font-medium text-gray-900 mb-3">Evolution API</h4>
-          <div className="space-y-3">
+        {/* Evolution API Configuration */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="text-lg font-medium text-gray-900">Evolution API</h4>
+            <div className="flex items-center gap-2">
+              {isUsingEnvConfig && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                  🔧 Using Environment Variables
+                </span>
+              )}
+              {isEvolutionConfigured && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                  ✅ Configured
+                </span>
+              )}
+            </div>
+          </div>
+
+          {hasEnvConfig && !isUsingEnvConfig && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-blue-800">Environment Variables Available</h3>
+                  <div className="mt-2 text-sm text-blue-700">
+                    <p>Environment variables are set but not currently used. You can use them by clicking "Use Environment Config" below.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label htmlFor="evolutionApiUrl" className="block text-sm font-medium text-gray-700">
-                API URL
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Base URL *
               </label>
               <input
                 type="url"
-                name="evolutionApiUrl"
-                id="evolutionApiUrl"
                 value={formData.evolutionApiUrl}
-                onChange={handleChange}
+                onChange={(e) => setFormData({ ...formData, evolutionApiUrl: e.target.value })}
                 placeholder="https://your-evolution-api.com"
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                disabled={isUsingEnvConfig}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${isUsingEnvConfig ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               />
             </div>
+            
             <div>
-              <label htmlFor="evolutionApiKey" className="block text-sm font-medium text-gray-700">
-                API Key
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                API Key *
               </label>
               <input
                 type="password"
-                name="evolutionApiKey"
-                id="evolutionApiKey"
                 value={formData.evolutionApiKey}
-                onChange={handleChange}
-                placeholder="Your Evolution API key"
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                onChange={(e) => setFormData({ ...formData, evolutionApiKey: e.target.value })}
+                placeholder="Your API key"
+                disabled={isUsingEnvConfig}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${isUsingEnvConfig ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               />
             </div>
           </div>
+
+          <div className="flex flex-wrap gap-3 mb-4">
+            {hasEnvConfig && !isUsingEnvConfig && (
+              <button
+                onClick={() => {
+                  const envConfig = {
+                    baseUrl: import.meta.env.VITE_EVOLUTION_API_URL,
+                    apiKey: import.meta.env.VITE_EVOLUTION_API_KEY
+                  };
+                  setEvolutionConfig(envConfig);
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    evolutionApiUrl: envConfig.baseUrl,
+                    evolutionApiKey: envConfig.apiKey
+                  }));
+                  setEvolutionTestResult(null);
+                }}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+              >
+                Use Environment Config
+              </button>
+            )}
+            
+            <button
+              onClick={handleSaveEvolutionConfig}
+              disabled={evolutionLoading || !formData.evolutionApiUrl || !formData.evolutionApiKey}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {evolutionLoading ? <LoadingSpinner size="sm" /> : 'Save Configuration'}
+            </button>
+            
+            <button
+              onClick={handleTestEvolutionConnection}
+              disabled={evolutionLoading || !isEvolutionConfigured}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+            >
+              Test Connection
+            </button>
+          </div>
+
+          {/* Test Result */}
+          {evolutionTestResult && (
+            <div className={`p-3 rounded-md mb-4 ${evolutionTestResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  {evolutionTestResult.success ? (
+                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+                <div className="ml-3">
+                  <h3 className={`text-sm font-medium ${evolutionTestResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                    {evolutionTestResult.success ? 'Connection Successful' : 'Connection Failed'}
+                  </h3>
+                  {evolutionTestResult.error && (
+                    <div className="mt-2 text-sm text-red-700">
+                      <p>{evolutionTestResult.error}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error Display */}
+          {evolutionError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">Error</h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{evolutionError}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Instance Management */}
+          {isEvolutionConfigured && (
+            <div className="border-t border-gray-200 pt-4">
+              <h5 className="text-md font-medium text-gray-900 mb-3">Evolution API Instances</h5>
+              
+              {/* Create New Instance */}
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={newInstanceName}
+                  onChange={(e) => setNewInstanceName(e.target.value)}
+                  placeholder="Enter instance name"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={handleCreateEvolutionInstance}
+                  disabled={evolutionLoading || !newInstanceName.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Create Instance
+                </button>
+                <button
+                  onClick={syncEvolutionInstances}
+                  disabled={evolutionLoading}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
+                >
+                  Sync
+                </button>
+              </div>
+
+              {/* Instances List */}
+              {evolutionInstances.length > 0 ? (
+                <div className="space-y-2">
+                  {evolutionInstances.map((instance) => (
+                    <div key={instance.instanceName} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+                      <div className="flex items-center space-x-3">
+                        <span className="font-medium">{instance.instanceName}</span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(instance.status)}`}>
+                          {instance.status}
+                        </span>
+                        {instance.owner && (
+                          <span className="text-sm text-gray-500">
+                            {instance.owner.replace('@s.whatsapp.net', '')}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        {instance.status === 'close' && (
+                          <button
+                            onClick={() => connectEvolutionInstance(instance.instanceName)}
+                            disabled={evolutionLoading}
+                            className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                          >
+                            Connect
+                          </button>
+                        )}
+                        {instance.status === 'open' && (
+                          <button
+                            onClick={() => disconnectEvolutionInstance(instance.instanceName)}
+                            disabled={evolutionLoading}
+                            className="px-3 py-1 text-sm bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+                          >
+                            Disconnect
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteEvolutionInstance(instance.instanceName)}
+                          disabled={evolutionLoading}
+                          className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  No instances found. Create your first instance above.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* OpenAI API */}
+        {/* Other API Configurations */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="text-md font-medium text-gray-900 mb-3">OpenAI API</h4>
           <div>
@@ -172,7 +482,6 @@ const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* Google Drive API */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="text-md font-medium text-gray-900 mb-3">Google Drive Integration</h4>
           <div>
@@ -191,7 +500,6 @@ const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* Webhook URL */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="text-md font-medium text-gray-900 mb-3">Webhook Configuration</h4>
           <div>
@@ -217,7 +525,7 @@ const Settings: React.FC = () => {
             disabled={isLoading}
             className="btn-primary"
           >
-            {isLoading ? <LoadingSpinner size="sm" /> : 'Save Configuration'}
+            {isLoading ? <LoadingSpinner size="sm" /> : 'Save Other Configurations'}
           </button>
         </div>
       </div>

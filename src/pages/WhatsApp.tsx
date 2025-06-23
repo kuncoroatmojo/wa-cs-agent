@@ -25,7 +25,7 @@ export const WhatsApp: React.FC = () => {
       setLoading(true)
       const data = await integrationService.getWhatsAppIntegrations(profile!.id)
       setIntegrations(data)
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error loading WhatsApp integrations:', error)
     } finally {
       setLoading(false)
@@ -36,7 +36,7 @@ export const WhatsApp: React.FC = () => {
     try {
       await integrationService.connectWhatsApp(integrationId)
       await loadIntegrations()
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error connecting WhatsApp:', error)
     }
   }
@@ -45,7 +45,7 @@ export const WhatsApp: React.FC = () => {
     try {
       await integrationService.disconnectWhatsApp(integrationId)
       await loadIntegrations()
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error disconnecting WhatsApp:', error)
     }
   }
@@ -177,7 +177,7 @@ const WhatsAppIntegrationCard: React.FC<WhatsAppIntegrationCardProps> = ({
     try {
       const qr = await integrationService.getWhatsAppQRCode(integration.id)
       setQrCode(qr)
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error getting QR code:', error)
     }
   }
@@ -331,7 +331,7 @@ const CreateWhatsAppModal: React.FC<{
       })
 
       onCreated()
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error creating WhatsApp integration:', error)
     } finally {
       setLoading(false)
@@ -450,7 +450,7 @@ const EditWhatsAppModal: React.FC<{
         phone_number: formData.phone_number || undefined,
       })
       onUpdated()
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error updating WhatsApp integration:', error)
     } finally {
       setLoading(false)
@@ -464,7 +464,7 @@ const EditWhatsAppModal: React.FC<{
       setLoading(true)
       await integrationService.deleteWhatsAppIntegration(integration.id)
       onUpdated()
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error deleting WhatsApp integration:', error)
     } finally {
       setLoading(false)

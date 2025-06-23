@@ -1,300 +1,389 @@
 import { supabase } from '../lib/supabase';
-import { generateQRCodeDataURL, generateWhatsAppQRData } from '../utils/qrCode';
+import { generateQRCodeDataURL } from '../utils/qrCode';
+import { evolutionApiService } from './evolutionApiService';
+import type { WhatsAppInstance, WhatsAppMessage } from '../types';
 
-interface WhatsAppSession {
-  instanceId: string;
+export interface WhatsAppConnectionStatus {
+  status: 'disconnected' | 'connecting' | 'connected' | 'error';
   qrCode?: string;
-  status: 'connecting' | 'connected' | 'disconnected' | 'error';
   phoneNumber?: string;
-}
-
-interface WhatsAppMessage {
-  from: string;
-  to: string;
-  message: string;
-  timestamp: Date;
-  type: 'text' | 'image' | 'document' | 'audio';
+  error?: string;
 }
 
 class WhatsAppService {
-  private sessions: Map<string, WhatsAppSession> = new Map();
-  private eventListeners: Map<string, ((event: any) => void)[]> = new Map();
+  private instances = new Map<string, WhatsAppInstance>();
+  private eventListeners = new Map<string, Set<(event: any) => void>>();
+  private statusPollingIntervals = new Map<string, NodeJS.Timeout>();
 
-  /**
-   * Initialize a WhatsApp connection for an instance
-   */
-  async initializeConnection(instanceId: string): Promise<{ success: boolean; qrCode?: string; error?: string }> {
+  // Initialize WhatsApp connection with mock fallback
+  async initializeConnection(instanceId: string): Promise<WhatsAppConnectionStatus> {
     try {
-      console.log('Initializing WhatsApp connection for instance:', instanceId);
+      
+      // Check if this is an Evolution API instance
+      const { data: instance } = await supabase
+        .from('whatsapp_instances')
+        .select('connection_type, instance_key')
+        .eq('id', instanceId)
+        .single();
 
-      // Check if session already exists
-      if (this.sessions.has(instanceId)) {
-        const session = this.sessions.get(instanceId)!;
-        if (session.status === 'connected') {
-          return { success: true };
-        }
+      if (instance?.connection_type === 'evolution_api') {
+        // For Evolution API instances, the connection should be handled by Evolution API service
+        return {
+          status: 'error',
+          error: 'Evolution API instances should be connected through Evolution API configuration page'
+        };
       }
 
-      // Create new session
-      const session: WhatsAppSession = {
-        instanceId,
-        status: 'connecting'
-      };
-
-      this.sessions.set(instanceId, session);
-
-      // In a real implementation, this would initialize Baileys
-      // For now, we'll simulate the QR code generation
-      const qrCode = await this.generateQRCode(instanceId);
-      
-      session.qrCode = qrCode;
-      
-      // Update database with QR code
-      await this.updateInstanceStatus(instanceId, 'connecting', qrCode);
-
-      // Simulate connection process
-      setTimeout(() => {
-        this.simulateConnection(instanceId);
-      }, 5000); // Simulate 5 second connection time
-
-      return { success: true, qrCode };
-
-    } catch (error) {
+      // Fallback to mock behavior for demo instances
+      return this.initializeMockConnection(instanceId);
+    } catch { // Ignored 
       console.error('Failed to initialize WhatsApp connection:', error);
-      await this.updateInstanceStatus(instanceId, 'error');
-      return { success: false, error: error instanceof Error ? error.message : 'Connection failed' };
+      return {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 
-  /**
-   * Generate QR code for WhatsApp Web connection
-   */
-  private async generateQRCode(instanceId: string): Promise<string> {
+  // Mock connection for demo purposes
+  private async initializeMockConnection(instanceId: string): Promise<WhatsAppConnectionStatus> {
+    
+    // Generate a visual QR code
+    const mockQrCode = await generateQRCodeDataURL('demo-whatsapp-connection');
+    
+    // Update instance status in database
+    await this.updateInstanceInDatabase(instanceId, 'connecting', mockQrCode);
+    
+    // Simulate connection after 8 seconds
+    setTimeout(async () => {
+      const mockPhoneNumber = `+1${Math.floor(Math.random() * 9000000000) + 1000000000}`;
+      await this.updateInstanceInDatabase(instanceId, 'connected', null, mockPhoneNumber);
+      
+      // Emit connection event
+      this.emitEvent(instanceId, 'connection', {
+        status: 'connected',
+        phoneNumber: mockPhoneNumber
+      });
+    }, 8000);
+    
+    return {
+      status: 'connecting',
+      qrCode: mockQrCode
+    };
+  }
+
+  // Get connection status from database
+  async getConnectionStatus(instanceId: string): Promise<WhatsAppConnectionStatus> {
     try {
-      // Generate WhatsApp Web QR code data
-      const qrData = generateWhatsAppQRData(instanceId);
-      
-      // Generate visual QR code image
-      const qrCodeDataURL = await generateQRCodeDataURL(qrData, 200);
-      
-      console.log('Generated QR code for instance:', instanceId);
-      console.log('QR data:', qrData);
-      
-      return qrCodeDataURL;
-    } catch (error) {
-      console.error('Failed to generate QR code:', error);
-      
-      // Fallback to text-based QR code
-      const qrData = generateWhatsAppQRData(instanceId);
-      return `data:text/plain;base64,${btoa(qrData)}`;
+      const { data, error } = await supabase
+        .from('whatsapp_instances')
+        .select('status, qr_code, phone_number')
+        .eq('id', instanceId)
+        .single();
+
+      if (error) throw error;
+
+      return {
+        status: data.status as any,
+        qrCode: data.qr_code,
+        phoneNumber: data.phone_number
+      };
+    } catch { // Ignored 
+      console.error('Failed to get connection status:', error);
+      return {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 
-  /**
-   * Simulate successful connection (for development)
-   */
-  private async simulateConnection(instanceId: string) {
-    const session = this.sessions.get(instanceId);
-    if (!session) return;
-
-    // Simulate successful connection
-    session.status = 'connected';
-    session.phoneNumber = '+1234567890'; // Mock phone number
+  // Start polling for status updates
+  private startStatusPolling(instanceId: string) {
+    // Clear existing interval
+    this.stopStatusPolling(instanceId);
     
-    await this.updateInstanceStatus(instanceId, 'connected', null, session.phoneNumber);
-    
-    // Emit connection event
-    this.emitEvent(instanceId, 'connected', { phoneNumber: session.phoneNumber });
-    
-    console.log(`WhatsApp instance ${instanceId} connected successfully`);
-  }
-
-  /**
-   * Disconnect WhatsApp instance
-   */
-  async disconnect(instanceId: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const session = this.sessions.get(instanceId);
-      if (session) {
-        session.status = 'disconnected';
-        session.qrCode = undefined;
-        session.phoneNumber = undefined;
+    const interval = setInterval(async () => {
+      try {
+        const status = await this.getConnectionStatus(instanceId);
+        this.emitEvent(instanceId, 'status', status);
+        
+        // Stop polling if connected or error
+        if (status.status === 'connected' || status.status === 'error') {
+          this.stopStatusPolling(instanceId);
+        }
+      } catch { // Ignored 
+        console.error('Status polling error:', error);
       }
+    }, 2000);
+    
+    this.statusPollingIntervals.set(instanceId, interval);
+  }
 
-      await this.updateInstanceStatus(instanceId, 'disconnected');
-      this.sessions.delete(instanceId);
-
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Disconnect failed' };
+  // Stop status polling
+  private stopStatusPolling(instanceId: string) {
+    const interval = this.statusPollingIntervals.get(instanceId);
+    if (interval) {
+      clearInterval(interval);
+      this.statusPollingIntervals.delete(instanceId);
     }
   }
 
-  /**
-   * Send a message through WhatsApp
-   */
+  // Send message (mock implementation)
   async sendMessage(instanceId: string, to: string, message: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const session = this.sessions.get(instanceId);
-      if (!session || session.status !== 'connected') {
-        throw new Error('WhatsApp instance not connected');
-      }
-
-      // In a real implementation, this would use Baileys to send the message
-      console.log(`Sending message from ${instanceId} to ${to}: ${message}`);
-
-      // Simulate message sending
-      const messageData: WhatsAppMessage = {
-        from: session.phoneNumber || 'unknown',
-        to,
-        message,
-        timestamp: new Date(),
-        type: 'text'
-      };
-
+      
+      // Mock message sending
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       // Store message in database
-      await this.storeMessage(instanceId, messageData);
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          instance_id: instanceId,
+          phone_number: to,
+          message_id: `msg_${Date.now()}`,
+          type: 'text',
+          content: message,
+          direction: 'outbound',
+          status: 'sent',
+          timestamp: new Date().toISOString()
+        });
+
+      if (error) throw error;
 
       return { success: true };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Send failed' };
+    } catch { // Ignored 
+      console.error('Failed to send message:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 
-  /**
-   * Get connection status
-   */
-  getStatus(instanceId: string): WhatsAppSession | null {
-    return this.sessions.get(instanceId) || null;
+  // Disconnect instance
+  async disconnect(instanceId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      
+      await this.updateInstanceInDatabase(instanceId, 'disconnected');
+      this.stopStatusPolling(instanceId);
+      
+      this.emitEvent(instanceId, 'disconnect', { instanceId });
+      
+      return { success: true };
+    } catch { // Ignored 
+      console.error('Failed to disconnect instance:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   }
 
-  /**
-   * Add event listener for WhatsApp events
-   */
+  // Update instance in database
+  private async updateInstanceInDatabase(
+    instanceId: string, 
+    status: string, 
+    qrCode?: string | null, 
+    phoneNumber?: string | null
+  ) {
+    try {
+      const updates: any = {
+        status,
+        updated_at: new Date().toISOString()
+      };
+
+      if (qrCode !== undefined) updates.qr_code = qrCode;
+      if (phoneNumber !== undefined) updates.phone_number = phoneNumber;
+
+      const { error } = await supabase
+        .from('whatsapp_instances')
+        .update(updates)
+        .eq('id', instanceId);
+
+      if (error) throw error;
+    } catch { // Ignored 
+      console.error('Failed to update instance in database:', error);
+    }
+  }
+
+  // Event handling
   addEventListener(instanceId: string, callback: (event: any) => void) {
     if (!this.eventListeners.has(instanceId)) {
-      this.eventListeners.set(instanceId, []);
+      this.eventListeners.set(instanceId, new Set());
     }
-    this.eventListeners.get(instanceId)!.push(callback);
+    this.eventListeners.get(instanceId)!.add(callback);
   }
 
-  /**
-   * Remove event listener
-   */
   removeEventListener(instanceId: string, callback: (event: any) => void) {
     const listeners = this.eventListeners.get(instanceId);
     if (listeners) {
-      const index = listeners.indexOf(callback);
-      if (index > -1) {
-        listeners.splice(index, 1);
-      }
+      listeners.delete(callback);
     }
   }
 
-  /**
-   * Emit event to listeners
-   */
   private emitEvent(instanceId: string, type: string, data: any) {
     const listeners = this.eventListeners.get(instanceId);
     if (listeners) {
       listeners.forEach(callback => {
         try {
           callback({ type, data, instanceId });
-        } catch (error) {
-          console.error('Error in event listener:', error);
+        } catch { // Ignored 
+          console.error('Event listener error:', error);
         }
       });
     }
   }
 
-  /**
-   * Update instance status in database
-   */
-  private async updateInstanceStatus(
-    instanceId: string, 
-    status: string, 
-    qrCode?: string | null, 
-    phoneNumber?: string
-  ) {
-    const updateData: any = {
-      status,
-      updated_at: new Date().toISOString()
-    };
-
-    if (qrCode !== undefined) {
-      updateData.qr_code = qrCode;
-    }
-
-    if (phoneNumber) {
-      updateData.phone_number = phoneNumber;
-    }
-
-    if (status === 'connected') {
-      updateData.last_connected_at = new Date().toISOString();
-    }
-
-    const { error } = await supabase
-      .from('whatsapp_instances')
-      .update(updateData)
-      .eq('id', instanceId);
-
-    if (error) {
-      console.error('Failed to update instance status:', error);
-    }
+  // Cleanup
+  cleanup() {
+    // Clear all polling intervals
+    this.statusPollingIntervals.forEach(interval => clearInterval(interval));
+    this.statusPollingIntervals.clear();
+    
+    // Clear event listeners
+    this.eventListeners.clear();
   }
 
-  /**
-   * Store message in database
-   */
-  private async storeMessage(instanceId: string, messageData: WhatsAppMessage) {
-    const { error } = await supabase
-      .from('conversations')
-      .insert({
-        instance_id: instanceId,
-        contact_phone: messageData.to,
-        message_content: messageData.message,
-        message_type: messageData.type,
-        direction: 'outbound',
-        timestamp: messageData.timestamp.toISOString()
-      });
-
-    if (error) {
-      console.error('Failed to store message:', error);
-    }
-  }
-
-  /**
-   * Handle incoming messages (would be called by Baileys event handlers)
-   */
-  async handleIncomingMessage(instanceId: string, from: string, message: string, type: 'text' | 'image' | 'document' | 'audio' = 'text') {
+  // Delete a WhatsApp instance
+  async deleteInstance(instanceId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // Store incoming message
-      await supabase
-        .from('conversations')
-        .insert({
-          instance_id: instanceId,
-          contact_phone: from,
-          message_content: message,
-          message_type: type,
-          direction: 'inbound',
-          timestamp: new Date().toISOString()
-        });
 
-      // Emit message event
-      this.emitEvent(instanceId, 'message', {
-        from,
-        message,
-        type,
-        timestamp: new Date()
-      });
+      // First get the instance details from database
+      const { data: instance, error: fetchError } = await supabase
+        .from('whatsapp_instances')
+        .select('*')
+        .eq('id', instanceId)
+        .single();
 
-      console.log(`Received message from ${from}: ${message}`);
-    } catch (error) {
-      console.error('Failed to handle incoming message:', error);
+      if (fetchError) {
+        throw new Error(`Failed to fetch instance details: ${fetchError.message}`);
+      }
+
+      if (!instance) {
+        throw new Error('Instance not found');
+      }
+
+      // Delete from Evolution API first
+      try {
+        await evolutionApiService.deleteInstance(instance.instance_key);
+      } catch { // Ignored 
+        // Continue with database deletion even if Evolution API fails
+      }
+
+      // Then delete from database
+      const { error: deleteError } = await supabase
+        .from('whatsapp_instances')
+        .delete()
+        .eq('id', instanceId);
+
+      if (deleteError) {
+        throw new Error(`Failed to delete from database: ${deleteError.message}`);
+      }
+
+      return { success: true };
+    } catch { // Ignored 
+      console.error('❌ Error deleting instance:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to delete instance' 
+      };
+    }
+  }
+
+  // Clean up stale instances
+  async cleanupStaleInstances(): Promise<{ success: boolean; error?: string }> {
+    try {
+
+      // Get all instances from database
+      const { data: dbInstances, error: fetchError } = await supabase
+        .from('whatsapp_instances')
+        .select('*');
+
+      if (fetchError) {
+        throw new Error(`Failed to fetch instances: ${fetchError.message}`);
+      }
+
+      // Get all instances from Evolution API
+      let evolutionInstances;
+      try {
+        evolutionInstances = await evolutionApiService.fetchInstances();
+      } catch { // Ignored 
+        console.error('Failed to fetch Evolution API instances:', error);
+        evolutionInstances = [];
+      }
+
+      // Create a map of Evolution API instances for quick lookup
+      const evolutionInstanceMap = new Map(
+        evolutionInstances.map(instance => [instance.instanceName, instance])
+      );
+
+      // Track cleanup results
+      const results = {
+        total: dbInstances?.length || 0,
+        removed: 0,
+        failed: 0,
+        errors: [] as string[]
+      };
+
+      // Process each database instance
+      for (const dbInstance of dbInstances || []) {
+        try {
+          const evolutionInstance = evolutionInstanceMap.get(dbInstance.instance_key);
+          
+          // If instance doesn't exist in Evolution API or is disconnected
+          if (!evolutionInstance || 
+              evolutionInstance.status === 'DISCONNECTED' || 
+              evolutionInstance.status === 'CLOSED') {
+            
+            console.log(`🗑️ Removing stale instance: ${dbInstance.name} (${dbInstance.instance_key})`);
+            
+            // Try to delete from Evolution API if it exists
+            if (evolutionInstance) {
+              try {
+                await evolutionApiService.deleteInstance(dbInstance.instance_key);
+              } catch { // Ignored 
+              }
+            }
+
+            // Delete from database
+            const { error: deleteError } = await supabase
+              .from('whatsapp_instances')
+              .delete()
+              .eq('id', dbInstance.id);
+
+            if (deleteError) {
+              throw new Error(`Failed to delete from database: ${deleteError.message}`);
+            }
+
+            results.removed++;
+          }
+        } catch { // Ignored 
+          results.failed++;
+          results.errors.push(`Failed to process ${dbInstance.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          console.error(`❌ Error processing instance ${dbInstance.name}:`, error);
+        }
+      }
+
+      return { 
+        success: true, 
+        error: results.failed > 0 ? `Failed to remove ${results.failed} instances` : undefined
+      };
+    } catch { // Ignored 
+      console.error('❌ Error during cleanup:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to cleanup instances'
+      };
     }
   }
 }
 
-// Export singleton instance
 export const whatsappService = new WhatsAppService();
-export default whatsappService; 
+
+// Cleanup on page unload
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    whatsappService.cleanup();
+  });
+} 

@@ -41,8 +41,8 @@ vercel --prod          # Deploy to production
 Add these in Vercel dashboard or via CLI:
 
 ```bash
-vercel env add VITE_SUPABASE_URL
-vercel env add VITE_SUPABASE_ANON_KEY
+vercel env add SUPABASE_URL
+vercel env add SUPABASE_ANON_KEY
 vercel env add VITE_EVOLUTION_API_URL
 vercel env add VITE_EVOLUTION_API_KEY
 vercel env add VITE_OPENAI_API_KEY

@@ -169,7 +169,7 @@ export class EnhancedChatService {
           confidenceScore: ragResponse.confidence
         }
       }
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error processing message:', error)
       
       // Fallback response
@@ -272,7 +272,7 @@ export class EnhancedChatService {
         totalCount: count || 0,
         analytics
       }
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error fetching sessions with analytics:', error)
       return {
         sessions: [],
@@ -338,7 +338,7 @@ export class EnhancedChatService {
         confidenceDistribution,
         timeline
       }
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error fetching conversation analytics:', error)
       return {
         messageCount: 0,
@@ -391,7 +391,7 @@ export class EnhancedChatService {
         avg_confidence: stats.avg_confidence,
         active_sessions: stats.active_sessions
       }
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error fetching usage metrics:', error)
       return {
         total_sessions: 0,
@@ -459,7 +459,7 @@ export class EnhancedChatService {
         successful_retrievals: successfulRetrievals,
         failed_retrievals: failedRetrievals
       }
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error fetching RAG metrics:', error)
       return {
         avg_similarity_score: 0,
@@ -530,7 +530,7 @@ export class EnhancedChatService {
         }
         
         processedCount++
-      } catch (error) {
+      } catch { // Ignored 
         errors.push({
           index: i,
           error: error instanceof Error ? error.message : 'Unknown error'
@@ -607,7 +607,7 @@ export class EnhancedChatService {
         archivedCount: sessionIds.length,
         archivedSessions: sessionIds
       }
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error archiving conversations:', error)
       return { archivedCount: 0, archivedSessions: [] }
     }

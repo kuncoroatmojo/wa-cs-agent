@@ -1,0 +1,102 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { useWhatsAppStore } from '../../../src/store/whatsappStore';
+
+// Mock Zustand
+vi.mock('zustand', () => ({
+  create: vi.fn((fn) => {
+    const store = fn(
+      vi.fn(),
+      vi.fn(),
+      { setState: vi.fn(), getState: vi.fn() }
+    );
+    return () => store;
+  })
+}));
+
+describe('WhatsAppStore', () => {
+  let store: ReturnType<typeof useWhatsAppStore>;
+
+  beforeEach(() => {
+    store = useWhatsAppStore();
+    vi.clearAllMocks();
+  });
+
+  describe('initial state', () => {
+    it('should have correct initial state', () => {
+      expect(store.instances).toEqual([]);
+      expect(store.loading).toBe(false);
+      expect(store.error).toBeNull();
+      expect(store.selectedInstance).toBeNull();
+    });
+  });
+
+  describe('setInstances', () => {
+    it('should update instances', () => {
+      const mockInstances = [
+        {
+          id: '1',
+          name: 'Test Instance',
+          instance_key: 'test-key',
+          status: 'connected' as const,
+          user_id: 'user-1'
+        }
+      ];
+
+      store.setInstances(mockInstances);
+      expect(store.instances).toEqual(mockInstances);
+    });
+  });
+
+  describe('setLoading', () => {
+    it('should update loading state', () => {
+      store.setLoading(true);
+      expect(store.loading).toBe(true);
+
+      store.setLoading(false);
+      expect(store.loading).toBe(false);
+    });
+  });
+
+  describe('setError', () => {
+    it('should update error state', () => {
+      const errorMessage = 'Test error';
+      store.setError(errorMessage);
+      expect(store.error).toBe(errorMessage);
+    });
+
+    it('should clear error when set to null', () => {
+      store.setError('Error');
+      store.setError(null);
+      expect(store.error).toBeNull();
+    });
+  });
+
+  describe('setSelectedInstance', () => {
+    it('should update selected instance', () => {
+      const mockInstance = {
+        id: '1',
+        name: 'Test Instance',
+        instance_key: 'test-key',
+        status: 'connected' as const,
+        user_id: 'user-1'
+      };
+
+      store.setSelectedInstance(mockInstance);
+      expect(store.selectedInstance).toEqual(mockInstance);
+    });
+
+    it('should clear selected instance when set to null', () => {
+      const mockInstance = {
+        id: '1',
+        name: 'Test Instance',
+        instance_key: 'test-key',
+        status: 'connected' as const,
+        user_id: 'user-1'
+      };
+
+      store.setSelectedInstance(mockInstance);
+      store.setSelectedInstance(null);
+      expect(store.selectedInstance).toBeNull();
+    });
+  });
+}); 

@@ -275,12 +275,10 @@ export class WhatsAppProvider extends BaseMessagingProvider {
 
   private async disconnectBaileys(): Promise<void> {
     // In a real implementation, this would properly close the Baileys connection
-    console.log('Disconnecting Baileys session')
   }
 
   private async sendBaileysMessage(to: string, options: SendMessageOptions): Promise<boolean> {
     // In a real implementation, this would send through Baileys
-    console.log('Sending Baileys message to:', to, 'Message:', options.message)
     return true
   }
 

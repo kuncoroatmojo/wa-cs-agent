@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './store/authStore';
+import { useEvolutionApiStore } from './store/evolutionApiStore';
 
 // Components
 import Layout from './components/Layout';
@@ -65,11 +66,14 @@ const PublicRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
 function App() {
   const { initialize, isLoading } = useAuthStore();
+  const { initialize: initializeEvolutionApi } = useEvolutionApiStore();
 
   useEffect(() => {
     // Initialize authentication state
     initialize();
-  }, [initialize]);
+    // Initialize Evolution API service
+    initializeEvolutionApi();
+  }, [initialize, initializeEvolutionApi]);
 
   if (isLoading) {
     return (

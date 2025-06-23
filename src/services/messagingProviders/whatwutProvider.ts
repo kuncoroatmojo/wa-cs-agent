@@ -192,7 +192,6 @@ export class WhatWutProvider extends BaseMessagingProvider {
 
       // Handle other event types (status updates, etc.)
       if (data.event) {
-        console.log('WhatWut event received:', data.event.type, data.event.data)
         
         // Update connection status based on events
         if (data.event.type === 'connection_status') {

@@ -27,7 +27,7 @@ const navigation = [
 const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
-  const { user, signOut } = useAuthStore();
+  const { profile, signOut } = useAuthStore();
 
   const handleSignOut = async () => {
     await signOut();
@@ -81,8 +81,8 @@ const Layout: React.FC = () => {
             <div className="flex items-center">
               <UserCircleIcon className="h-8 w-8 text-gray-400" />
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-700">{user?.name}</p>
-                <p className="text-xs font-medium text-gray-500">{user?.email}</p>
+                <p className="text-sm font-medium text-gray-700">{profile?.full_name}</p>
+                <p className="text-xs font-medium text-gray-500">{profile?.email}</p>
               </div>
             </div>
           </div>
@@ -125,8 +125,8 @@ const Layout: React.FC = () => {
               <div className="flex items-center w-full">
                 <UserCircleIcon className="h-8 w-8 text-gray-400" />
                 <div className="ml-3 flex-1">
-                  <p className="text-sm font-medium text-gray-700">{user?.name}</p>
-                  <p className="text-xs font-medium text-gray-500">{user?.email}</p>
+                  <p className="text-sm font-medium text-gray-700">{profile?.full_name}</p>
+                  <p className="text-xs font-medium text-gray-500">{profile?.email}</p>
                 </div>
                 <button
                   onClick={handleSignOut}
@@ -154,9 +154,9 @@ const Layout: React.FC = () => {
         </div>
 
         {/* Page content */}
-        <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+        <main className="flex-1 relative z-0 focus:outline-none">
+          <div className="h-full">
+            <div className="h-full mx-auto">
               <Outlet />
             </div>
           </div>

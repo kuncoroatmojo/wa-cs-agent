@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { WhatsAppInstance, Conversation } from '../types';
 import { supabase } from '../lib/supabase';
+import { whatsappService } from '../services/whatsappService';
 
 interface WhatsAppStore {
   // State
@@ -31,6 +32,8 @@ interface WhatsAppStore {
   // Real-time subscriptions
   subscribeToInstances: () => () => void;
   subscribeToConversations: () => () => void;
+
+  cleanupStaleInstances: () => Promise<{ success: boolean; error?: string }>;
 }
 
 export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
@@ -67,6 +70,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
         name: item.name,
         status: item.status,
         connectionType: item.connection_type,
+        instanceKey: item.instance_key,
         phoneNumber: item.phone_number,
         qrCode: item.qr_code,
         lastSeen: item.last_connected_at,
@@ -77,7 +81,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       }));
 
       set({ instances, isLoading: false });
-    } catch (error) {
+    } catch { // Ignored 
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch instances',
         isLoading: false 
@@ -92,25 +96,24 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       const instanceKey = `instance_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       const insertData = {
-        name: data.name || '',
-        connection_type: data.connectionType || 'baileys',
-        user_id: data.userId || '',
+          name: data.name || '',
+          connection_type: data.connectionType || 'baileys',
+          user_id: data.userId || '',
         instance_key: instanceKey,
-        settings: data.settings || {
-          autoReply: true,
-          businessHours: {
-            enabled: false,
-            timezone: 'UTC',
-            schedule: {}
-          },
-          welcomeMessage: 'Hello! How can I help you today?',
-          outOfHoursMessage: 'We are currently closed. Please try again during business hours.',
-          humanHandoffKeywords: ['human', 'agent', 'support'],
-          maxResponseTime: 30
-        }
+          settings: data.settings || {
+            autoReply: true,
+            businessHours: {
+              enabled: false,
+              timezone: 'UTC',
+              schedule: {}
+            },
+            welcomeMessage: 'Hello! How can I help you today?',
+            outOfHoursMessage: 'We are currently closed. Please try again during business hours.',
+            humanHandoffKeywords: ['human', 'agent', 'support'],
+            maxResponseTime: 30
+          }
       };
 
-      console.log('Creating WhatsApp instance with data:', insertData);
 
       const { data: instance, error } = await supabase
         .from('whatsapp_instances')
@@ -123,7 +126,6 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
         throw error;
       }
 
-      console.log('WhatsApp instance created successfully:', instance);
 
       // For Baileys connections, immediately start the connection to generate QR code
       if ((data.connectionType || 'baileys') === 'baileys') {
@@ -139,9 +141,8 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
             console.error('Failed to start WhatsApp connection:', connectResponse.error);
             // Don't fail the entire operation, just log the error
           } else {
-            console.log('WhatsApp connection started:', connectResponse.data);
           }
-        } catch (connectError) {
+        } catch { // Ignored 
           console.error('Failed to call whatsapp-connect function:', connectError);
           // Don't fail the entire operation, just log the error
         }
@@ -152,7 +153,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       
       set({ isLoading: false });
       return { success: true };
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Create instance error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create instance';
       set({ error: errorMessage, isLoading: false });
@@ -183,7 +184,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       
       set({ isLoading: false });
       return { success: true };
-    } catch (error) {
+    } catch { // Ignored 
       const errorMessage = error instanceof Error ? error.message : 'Failed to update instance';
       set({ error: errorMessage, isLoading: false });
       return { success: false, error: errorMessage };
@@ -194,12 +195,10 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      const { error } = await supabase
-        .from('whatsapp_instances')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      const result = await whatsappService.deleteInstance(id);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
 
       // Remove from local state
       const { instances, activeInstance } = get();
@@ -213,7 +212,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       });
       
       return { success: true };
-    } catch (error) {
+    } catch { // Ignored 
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete instance';
       set({ error: errorMessage, isLoading: false });
       return { success: false, error: errorMessage };
@@ -267,7 +266,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       }));
 
       set({ conversations, isLoading: false });
-    } catch (error) {
+    } catch { // Ignored 
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch conversations',
         isLoading: false 
@@ -296,7 +295,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       }
 
       return { success: true };
-    } catch (error) {
+    } catch { // Ignored 
       const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
       return { success: false, error: errorMessage };
     }
@@ -308,13 +307,13 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
       .on(
         'postgres_changes',
         {
-          event: '*',
-          schema: 'public',
-          table: 'whatsapp_instances'
+        event: '*',
+        schema: 'public',
+        table: 'whatsapp_instances'
         },
         () => {
-          // Refresh instances when changes occur
-          get().fetchInstances();
+        // Refresh instances when changes occur
+        get().fetchInstances();
         }
       )
       .subscribe();
@@ -338,5 +337,37 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
     return () => {
       subscription.unsubscribe();
     };
-  }
+  },
+
+  cleanupStaleInstances: async () => {
+    set({ isLoading: true, error: null });
+    
+    try {
+      const result = await whatsappService.cleanupStaleInstances();
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      // Refresh instances list
+      const { data: instances, error: fetchError } = await supabase
+        .from('whatsapp_instances')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (fetchError) {
+        throw new Error(fetchError.message);
+      }
+
+      set({ 
+        instances: instances || [],
+        isLoading: false 
+      });
+      
+      return { success: true };
+    } catch { // Ignored 
+      const errorMessage = error instanceof Error ? error.message : 'Failed to cleanup instances';
+      set({ error: errorMessage, isLoading: false });
+      return { success: false, error: errorMessage };
+    }
+  },
 })); 

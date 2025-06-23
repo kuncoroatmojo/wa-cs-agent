@@ -530,7 +530,7 @@ export class HandoffService {
       await this.updateSessionHandoffStatus(sessionId, 'pending')
 
       return data
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error creating handoff request:', error)
       throw error
     }
@@ -563,7 +563,7 @@ export class HandoffService {
 
       if (error) throw error
       return data || []
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error fetching pending handoff requests:', error)
       return []
     }
@@ -596,7 +596,7 @@ export class HandoffService {
       await this.updateSessionHandoffStatus(data.session_id, 'assigned')
 
       return data
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error assigning handoff request:', error)
       throw error
     }
@@ -627,7 +627,7 @@ export class HandoffService {
 
       // Update session status back to AI
       await this.updateSessionHandoffStatus(data.session_id, 'resolved')
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error resolving handoff request:', error)
       throw error
     }
@@ -650,7 +650,7 @@ export class HandoffService {
           }
         })
         .eq('id', sessionId)
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error updating session handoff status:', error)
     }
   }
@@ -668,7 +668,6 @@ export class HandoffService {
       
       // Get available agents (this would need an agents table)
       // For now, we'll just log the notification
-      console.log(`🚨 Handoff notification: ${urgency} priority request ${handoffId}`)
       
       // In a real implementation, this could:
       // 1. Send push notifications to agent apps
@@ -689,7 +688,7 @@ export class HandoffService {
             created_at: new Date().toISOString()
           }
         })
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error notifying agents:', error)
     }
   }
@@ -735,7 +734,7 @@ export class HandoffService {
         },
         avgResolutionTime: this.calculateAverageResolutionTime(requests)
       }
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error fetching handoff statistics:', error)
       return {
         total: 0,

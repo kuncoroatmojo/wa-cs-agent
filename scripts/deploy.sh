@@ -138,8 +138,8 @@ check_environment() {
     
     # List of required environment variables
     REQUIRED_VARS=(
-        "VITE_SUPABASE_URL"
-        "VITE_SUPABASE_ANON_KEY"
+        "SUPABASE_URL"
+        "SUPABASE_ANON_KEY"
         "VITE_EVOLUTION_API_URL"
         "VITE_EVOLUTION_API_KEY"
         "VITE_OPENAI_API_KEY"

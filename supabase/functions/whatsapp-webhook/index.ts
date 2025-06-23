@@ -21,6 +21,30 @@ interface WhatsAppWebhookPayload {
   metadata?: Record<string, any>;
 }
 
+interface EvolutionWebhookEvent {
+  event: string;
+  instance: string;
+  data: {
+    key: {
+      remoteJid: string;
+      fromMe: boolean;
+      id: string;
+    };
+    pushName?: string;
+    message?: {
+      conversation?: string;
+      extendedTextMessage?: {
+        text?: string;
+      };
+      [key: string]: any;
+    };
+    messageType: string;
+    messageTimestamp: number;
+    status?: string;
+    [key: string]: any;
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -33,105 +57,352 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const webhookPayload: WhatsAppWebhookPayload = await req.json()
-    const { instanceKey, message } = webhookPayload
-
-    console.log('WhatsApp webhook received:', { instanceKey, from: message.from, messageId: message.messageId })
-
-    // 1. Find the WhatsApp integration by instance key
-    const { data: integration, error: integrationError } = await supabase
-      .from('whatsapp_integrations')
-      .select('*')
-      .eq('instance_key', instanceKey)
-      .eq('status', 'connected')
-      .single()
-
-    if (integrationError || !integration) {
-      console.error('WhatsApp integration not found or not connected:', instanceKey)
+    if (req.method !== 'POST') {
       return new Response(
-        JSON.stringify({ error: 'Integration not found or not connected' }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: 'Method not allowed' }),
+        { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // 2. Verify webhook authenticity (optional security measure)
-    const webhookSecret = Deno.env.get('WEBHOOK_SECRET')
-    if (webhookSecret) {
-      const signature = req.headers.get('x-webhook-signature')
-      // Add signature verification logic here if needed
+    const webhookEvent: EvolutionWebhookEvent = await req.json()
+    console.log('📨 Received Evolution API webhook:', JSON.stringify(webhookEvent, null, 2))
+
+    // Process different event types
+    switch (webhookEvent.event) {
+      case 'APPLICATION_STARTUP':
+        await handleApplicationStartup(supabase, webhookEvent)
+        break
+      case 'QRCODE_UPDATED':
+        await handleQRCodeUpdated(supabase, webhookEvent)
+        break
+      case 'MESSAGES_SET':
+        await handleMessagesSet(supabase, webhookEvent)
+        break
+      case 'MESSAGES_UPSERT':
+      case 'messages.upsert':
+        await handleMessageUpsert(supabase, webhookEvent)
+        break
+      case 'MESSAGES_UPDATE':
+      case 'messages.update':
+        await handleMessageUpdate(supabase, webhookEvent)
+        break
+      case 'MESSAGES_DELETE':
+        await handleMessageDelete(supabase, webhookEvent)
+        break
+      case 'SEND_MESSAGE':
+        await handleSendMessage(supabase, webhookEvent)
+        break
+      case 'CONTACTS_SET':
+        await handleContactsSet(supabase, webhookEvent)
+        break
+      case 'CONTACTS_UPSERT':
+      case 'contacts.update':
+        await handleContactsUpdate(supabase, webhookEvent)
+        break
+      case 'CONTACTS_UPDATE':
+        await handleContactsUpdate(supabase, webhookEvent)
+        break
+      case 'PRESENCE_UPDATE':
+      case 'presence.update':
+        await handlePresenceUpdate(supabase, webhookEvent)
+        break
+      case 'CHATS_SET':
+        await handleChatsSet(supabase, webhookEvent)
+        break
+      case 'CHATS_UPSERT':
+      case 'chats.upsert':
+        await handleChatsUpsert(supabase, webhookEvent)
+        break
+      case 'CHATS_UPDATE':
+      case 'chats.update':
+        await handleChatsUpdate(supabase, webhookEvent)
+        break
+      case 'CHATS_DELETE':
+        await handleChatsDelete(supabase, webhookEvent)
+        break
+      case 'GROUPS_UPSERT':
+        await handleGroupsUpsert(supabase, webhookEvent)
+        break
+      case 'GROUP_UPDATE':
+        await handleGroupUpdate(supabase, webhookEvent)
+        break
+      case 'GROUP_PARTICIPANTS_UPDATE':
+        await handleGroupParticipantsUpdate(supabase, webhookEvent)
+        break
+      case 'CONNECTION_UPDATE':
+      case 'connection.update':
+        await handleConnectionUpdate(supabase, webhookEvent)
+        break
+      case 'CALL':
+        await handleCall(supabase, webhookEvent)
+        break
+      case 'NEW_JWT_TOKEN':
+        await handleNewJwtToken(supabase, webhookEvent)
+        break
+      default:
+        console.log(`⚠️ Unhandled webhook event type: ${webhookEvent.event}`)
     }
-
-    // 3. Get or create chat session for this sender
-    const { data: session, error: sessionError } = await getOrCreateWhatsAppSession(
-      supabase,
-      integration.user_id,
-      message.from,
-      integration.name
-    )
-
-    if (sessionError || !session) {
-      throw new Error('Failed to create or get session')
-    }
-
-    // 4. Skip processing if it's not a text message for now
-    if (message.type !== 'text') {
-      console.log('Skipping non-text message:', message.type)
-      return new Response(
-        JSON.stringify({ success: true, skipped: true, reason: 'non-text message' }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      )
-    }
-
-    // 5. Call chat completion to generate AI response
-    const { data: chatResponse, error: chatError } = await supabase.functions.invoke('chat-completion', {
-      body: {
-        session_id: session.id,
-        message: message.body,
-        sender_id: message.from,
-        sender_type: 'whatsapp',
-        use_rag: true
-      }
-    })
-
-    if (chatError) {
-      console.error('Chat completion failed:', chatError)
-      throw new Error('Failed to generate AI response')
-    }
-
-    // 6. Send response back to WhatsApp
-    const whatsappResponse = await sendWhatsAppMessage(
-      integration,
-      message.from,
-      chatResponse.response
-    )
-
-    // 7. Update integration last activity
-    await supabase
-      .from('whatsapp_integrations')
-      .update({ last_connected_at: new Date().toISOString() })
-      .eq('id', integration.id)
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        session_id: session.id,
-        response_sent: whatsappResponse.success,
-        message_id: chatResponse.message_id
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: true, message: 'Webhook processed' }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('WhatsApp webhook error:', error)
+    console.error('❌ Error processing webhook:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      }
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
+
+async function handleMessageUpsert(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    const { key, pushName, message, messageType, messageTimestamp } = data
+
+    console.log('💬 Processing message upsert for instance:', instance)
+
+    // Find the WhatsApp instance in our database
+    const { data: whatsappInstance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('id, user_id, instance_key')
+      .eq('instance_key', instance)
+      .single()
+
+    if (instanceError || !whatsappInstance) {
+      console.error('❌ WhatsApp instance not found:', instance)
+      return
+    }
+
+    // Extract contact information
+    const contactId = key.remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', '')
+    const isGroup = key.remoteJid.includes('@g.us')
+    
+    // Determine contact name with fallbacks
+    let contactName = pushName || data.verifiedName || data.notifyName || contactId;
+
+    // Check for existing conversation using external_conversation_id and instance_key first
+    const { data: existingConversations } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('external_conversation_id', key.remoteJid)
+      .eq('instance_key', instance)
+      .limit(1);
+
+    let conversation;
+    let convError;
+
+    if (existingConversations && existingConversations.length > 0) {
+      // Update existing conversation
+      const existingConv = existingConversations[0];
+      const updateResult = await supabase
+        .from('conversations')
+        .update({
+          contact_name: contactName,
+          contact_metadata: {
+            isGroup,
+            remoteJid: key.remoteJid,
+            pushName,
+            verifiedName: data.verifiedName,
+            notifyName: data.notifyName
+          },
+          status: 'active',
+          last_synced_at: new Date().toISOString(),
+          sync_status: 'synced',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingConv.id)
+        .select()
+        .single();
+      
+      conversation = updateResult.data;
+      convError = updateResult.error;
+      console.log('✅ Updated existing conversation:', conversation?.id);
+    } else {
+      // Create new conversation
+      const createResult = await supabase
+        .from('conversations')
+        .insert({
+          user_id: whatsappInstance.user_id,
+          integration_type: 'whatsapp',
+          integration_id: whatsappInstance.id,
+          instance_key: instance,
+          contact_id: contactId,
+          contact_name: contactName,
+          contact_metadata: {
+            isGroup,
+            remoteJid: key.remoteJid,
+            pushName,
+            verifiedName: data.verifiedName,
+            notifyName: data.notifyName
+          },
+          external_conversation_id: key.remoteJid,
+          status: 'active',
+          last_synced_at: new Date().toISOString(),
+          sync_status: 'synced'
+        })
+        .select()
+        .single();
+      
+      conversation = createResult.data;
+      convError = createResult.error;
+      console.log('✅ Created new conversation:', conversation?.id);
+    }
+
+    if (convError) {
+      console.error('❌ Error upserting conversation:', convError)
+      return
+    }
+
+    console.log('✅ Conversation upserted:', conversation.id)
+
+    // Extract message content
+    let messageContent = '[Media]'
+    if (message?.conversation) {
+      messageContent = message.conversation
+    } else if (message?.extendedTextMessage?.text) {
+      messageContent = message.extendedTextMessage.text
+    } else if (message?.imageMessage?.caption) {
+      messageContent = message.imageMessage.caption
+    } else if (message?.videoMessage?.caption) {
+      messageContent = message.videoMessage.caption
+    }
+
+    // Map message type
+    let unifiedMessageType = 'text'
+    if (messageType.includes('image')) unifiedMessageType = 'image'
+    else if (messageType.includes('audio')) unifiedMessageType = 'audio'
+    else if (messageType.includes('video')) unifiedMessageType = 'video'
+    else if (messageType.includes('document')) unifiedMessageType = 'document'
+    else if (messageType.includes('location')) unifiedMessageType = 'location'
+    else if (messageType.includes('contact')) unifiedMessageType = 'contact'
+    else if (messageType.includes('sticker')) unifiedMessageType = 'sticker'
+
+    // Insert message
+    const { error: messageError } = await supabase
+      .from('conversation_messages')
+      .upsert({
+        conversation_id: conversation.id,
+        content: messageContent,
+        message_type: unifiedMessageType,
+        direction: key.fromMe ? 'outbound' : 'inbound',
+        sender_type: key.fromMe ? 'bot' : 'contact',
+        sender_name: pushName,
+        sender_id: key.fromMe ? instance : key.remoteJid,
+        status: 'delivered',
+        external_message_id: key.id,
+        external_timestamp: new Date(messageTimestamp * 1000).toISOString(),
+        external_metadata: data
+      }, {
+        onConflict: 'external_message_id'
+      })
+
+    if (messageError) {
+      console.error('❌ Error inserting message:', messageError)
+      return
+    }
+
+    console.log('✅ Message processed successfully')
+
+    // Create sync event for tracking
+    await supabase
+      .from('conversation_sync_events')
+      .insert({
+        user_id: whatsappInstance.user_id,
+        integration_type: 'whatsapp',
+        integration_id: whatsappInstance.id,
+        event_type: 'message_received',
+        event_data: event,
+        processed: true,
+        processed_at: new Date().toISOString()
+      })
+
+  } catch (error) {
+    console.error('❌ Error in handleMessageUpsert:', error)
+    throw error
+  }
+}
+
+async function handleMessageUpdate(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { data } = event
+    const { key, status } = data
+
+    console.log('📝 Processing message update:', key.id, 'status:', status)
+
+    // Update message status if it exists
+    const { error } = await supabase
+      .from('conversation_messages')
+      .update({
+        status: mapMessageStatus(status),
+        updated_at: new Date().toISOString()
+      })
+      .eq('external_message_id', key.id)
+
+    if (error) {
+      console.error('❌ Error updating message status:', error)
+    } else {
+      console.log('✅ Message status updated')
+    }
+
+  } catch (error) {
+    console.error('❌ Error in handleMessageUpdate:', error)
+    throw error
+  }
+}
+
+async function handleConnectionUpdate(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    const { state } = data
+
+    console.log('🔗 Processing connection update for instance:', instance, 'state:', state)
+
+    // Update instance status in our database
+    let status = 'disconnected'
+    if (state === 'open') status = 'connected'
+    else if (state === 'connecting') status = 'connecting'
+    else if (state === 'close') status = 'disconnected'
+
+    const { error } = await supabase
+      .from('whatsapp_instances')
+      .update({
+        status,
+        last_connected_at: status === 'connected' ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('instance_key', instance)
+
+    if (error) {
+      console.error('❌ Error updating instance status:', error)
+    } else {
+      console.log('✅ Instance status updated')
+    }
+
+  } catch (error) {
+    console.error('❌ Error in handleConnectionUpdate:', error)
+    throw error
+  }
+}
+
+function mapMessageStatus(evolutionStatus?: string): string {
+  switch (evolutionStatus) {
+    case 'PENDING':
+      return 'pending'
+    case 'SERVER_ACK':
+      return 'sent'
+    case 'DELIVERY_ACK':
+      return 'delivered'
+    case 'READ':
+      return 'read'
+    case 'ERROR':
+      return 'failed'
+    default:
+      return 'delivered'
+  }
+}
 
 async function getOrCreateWhatsAppSession(
   supabase: any,
@@ -246,4 +517,573 @@ async function sendWhatsAppBaileys(
     success: true,
     messageId: `baileys_${Date.now()}`
   }
-} 
+}
+
+async function handleContactsUpdate(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    const { id, notify, verifiedName, pushName } = data
+
+    console.log('👤 Processing contacts update for instance:', instance)
+
+    // Find the WhatsApp instance
+    const { data: whatsappInstance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('id, user_id')
+      .eq('instance_key', instance)
+      .single()
+
+    if (instanceError || !whatsappInstance) {
+      console.error('❌ WhatsApp instance not found:', instance)
+      return
+    }
+
+    // Extract contact ID from JID
+    const contactId = id.replace('@s.whatsapp.net', '').replace('@g.us', '')
+
+    // Update conversation with new contact info
+    const { error: updateError } = await supabase
+      .from('conversations')
+      .update({
+        contact_name: verifiedName || notify || pushName || undefined,
+        contact_metadata: {
+          verifiedName,
+          notify,
+          pushName
+        },
+        last_synced_at: new Date().toISOString()
+      })
+      .eq('user_id', whatsappInstance.user_id)
+      .eq('integration_type', 'whatsapp')
+      .eq('contact_id', contactId)
+      .eq('integration_id', whatsappInstance.id)
+
+    if (updateError) {
+      console.error('❌ Error updating contact info:', updateError)
+    } else {
+      console.log('✅ Contact info updated for:', contactId)
+    }
+
+  } catch (error) {
+    console.error('❌ Error in handleContactsUpdate:', error)
+    throw error
+  }
+}
+
+async function handleChatsUpdate(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    const { id, unreadCount, lastMessageTimestamp } = data
+
+    console.log('💬 Processing chats update for instance:', instance)
+
+    // Find the WhatsApp instance
+    const { data: whatsappInstance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('id, user_id')
+      .eq('instance_key', instance)
+      .single()
+
+    if (instanceError || !whatsappInstance) {
+      console.error('❌ WhatsApp instance not found:', instance)
+      return
+    }
+
+    // Extract contact ID from JID
+    const contactId = id.replace('@s.whatsapp.net', '').replace('@g.us', '')
+
+    // Update conversation with chat info
+    const { error: updateError } = await supabase
+      .from('conversations')
+      .update({
+        unread_count: unreadCount,
+        last_message_at: lastMessageTimestamp ? new Date(lastMessageTimestamp * 1000).toISOString() : undefined,
+        last_synced_at: new Date().toISOString()
+      })
+      .eq('user_id', whatsappInstance.user_id)
+      .eq('integration_type', 'whatsapp')
+      .eq('contact_id', contactId)
+      .eq('integration_id', whatsappInstance.id)
+
+    if (updateError) {
+      console.error('❌ Error updating chat info:', updateError)
+    } else {
+      console.log('✅ Chat info updated for:', contactId)
+    }
+
+  } catch (error) {
+    console.error('❌ Error in handleChatsUpdate:', error)
+    throw error
+  }
+}
+
+async function handleChatsUpsert(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    const { id, name, unreadCount } = data
+
+    console.log('➕ Processing chats upsert for instance:', instance)
+
+    // Find the WhatsApp instance
+    const { data: whatsappInstance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('id, user_id')
+      .eq('instance_key', instance)
+      .single()
+
+    if (instanceError || !whatsappInstance) {
+      console.error('❌ WhatsApp instance not found:', instance)
+      return
+    }
+
+    // Extract contact ID and check if it's a group
+    const contactId = id.replace('@s.whatsapp.net', '').replace('@g.us', '')
+    const isGroup = id.includes('@g.us')
+
+    // Upsert conversation
+    const { error: upsertError } = await supabase
+      .from('conversations')
+      .upsert({
+        user_id: whatsappInstance.user_id,
+        integration_type: 'whatsapp',
+        integration_id: whatsappInstance.id,
+        instance_key: instance,
+        contact_id: contactId,
+        contact_name: name,
+        contact_metadata: {
+          isGroup,
+          remoteJid: id,
+          unreadCount
+        },
+        external_conversation_id: id,
+        status: 'active',
+        unread_count: unreadCount,
+        last_synced_at: new Date().toISOString(),
+        sync_status: 'synced'
+      }, {
+        onConflict: 'user_id,integration_type,contact_id,integration_id'
+      })
+
+    if (upsertError) {
+      console.error('❌ Error upserting chat:', upsertError)
+    } else {
+      console.log('✅ Chat upserted for:', contactId)
+    }
+
+  } catch (error) {
+    console.error('❌ Error in handleChatsUpsert:', error)
+    throw error
+  }
+}
+
+async function handlePresenceUpdate(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    const { id, presences } = data
+
+    console.log('👀 Processing presence update for instance:', instance)
+
+    // Find the WhatsApp instance
+    const { data: whatsappInstance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('id, user_id')
+      .eq('instance_key', instance)
+      .single()
+
+    if (instanceError || !whatsappInstance) {
+      console.error('❌ WhatsApp instance not found:', instance)
+      return
+    }
+
+    // Extract contact ID from JID
+    const contactId = id.replace('@s.whatsapp.net', '').replace('@g.us', '')
+
+    // Update conversation with presence info
+    const { error: updateError } = await supabase
+      .from('conversations')
+      .update({
+        contact_metadata: {
+          presence: presences,
+          lastPresenceUpdate: new Date().toISOString()
+        },
+        last_synced_at: new Date().toISOString()
+      })
+      .eq('user_id', whatsappInstance.user_id)
+      .eq('integration_type', 'whatsapp')
+      .eq('contact_id', contactId)
+      .eq('integration_id', whatsappInstance.id)
+
+    if (updateError) {
+      console.error('❌ Error updating presence info:', updateError)
+    } else {
+      console.log('✅ Presence info updated for:', contactId)
+    }
+
+  } catch (error) {
+    console.error('❌ Error in handlePresenceUpdate:', error)
+    throw error
+  }
+}
+
+// New handler functions for additional Evolution API events
+
+async function handleApplicationStartup(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('🚀 Application startup for instance:', instance)
+    
+    // Update instance status to connected
+    const { error } = await supabase
+      .from('whatsapp_instances')
+      .update({
+        status: 'connected',
+        last_connected_at: new Date().toISOString(),
+        metadata: {
+          ...data,
+          lastStartup: new Date().toISOString()
+        }
+      })
+      .eq('instance_key', instance)
+
+    if (error) {
+      console.error('❌ Error updating instance startup status:', error)
+    } else {
+      console.log('✅ Instance startup status updated')
+    }
+  } catch (error) {
+    console.error('❌ Error in handleApplicationStartup:', error)
+  }
+}
+
+async function handleQRCodeUpdated(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('📱 QR Code updated for instance:', instance)
+    
+    // Update instance with QR code info
+    const { error } = await supabase
+      .from('whatsapp_instances')
+      .update({
+        status: 'qr_code',
+        qr_code: data.qrcode || data.qr,
+        metadata: {
+          ...data,
+          qrUpdatedAt: new Date().toISOString()
+        }
+      })
+      .eq('instance_key', instance)
+
+    if (error) {
+      console.error('❌ Error updating QR code:', error)
+    } else {
+      console.log('✅ QR code updated')
+    }
+  } catch (error) {
+    console.error('❌ Error in handleQRCodeUpdated:', error)
+  }
+}
+
+async function handleMessagesSet(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('📦 Messages set received for instance:', instance, 'Count:', data?.length || 0)
+    
+    // This event typically contains bulk message data
+    // Process each message in the set
+    if (Array.isArray(data)) {
+      for (const messageData of data) {
+        const messageEvent: EvolutionWebhookEvent = {
+          event: 'MESSAGES_UPSERT',
+          instance,
+          data: messageData
+        }
+        await handleMessageUpsert(supabase, messageEvent)
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error in handleMessagesSet:', error)
+  }
+}
+
+async function handleMessageDelete(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    const messageId = data.key?.id || data.id
+    
+    console.log('🗑️ Message delete for instance:', instance, 'Message ID:', messageId)
+    
+    if (!messageId) {
+      console.log('⚠️ No message ID found in delete event')
+      return
+    }
+
+    // Mark message as deleted
+    const { error } = await supabase
+      .from('conversation_messages')
+      .update({
+        status: 'deleted',
+        deleted_at: new Date().toISOString(),
+        metadata: {
+          ...data,
+          deletedBy: 'evolution_api'
+        }
+      })
+      .eq('external_message_id', messageId)
+
+    if (error) {
+      console.error('❌ Error marking message as deleted:', error)
+    } else {
+      console.log('✅ Message marked as deleted')
+    }
+  } catch (error) {
+    console.error('❌ Error in handleMessageDelete:', error)
+  }
+}
+
+async function handleSendMessage(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('📤 Send message event for instance:', instance)
+    
+    // This is typically fired when a message is sent
+    // We can use this to track outgoing message analytics
+    await handleMessageUpsert(supabase, {
+      ...event,
+      event: 'MESSAGES_UPSERT'
+    })
+  } catch (error) {
+    console.error('❌ Error in handleSendMessage:', error)
+  }
+}
+
+async function handleContactsSet(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('📇 Contacts set received for instance:', instance, 'Count:', data?.length || 0)
+    
+    // This event typically contains bulk contact data
+    if (Array.isArray(data)) {
+      for (const contactData of data) {
+        const contactEvent: EvolutionWebhookEvent = {
+          event: 'CONTACTS_UPSERT',
+          instance,
+          data: contactData
+        }
+        await handleContactsUpdate(supabase, contactEvent)
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error in handleContactsSet:', error)
+  }
+}
+
+async function handleChatsSet(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('💬 Chats set received for instance:', instance, 'Count:', data?.length || 0)
+    
+    // This event typically contains bulk chat data
+    if (Array.isArray(data)) {
+      for (const chatData of data) {
+        const chatEvent: EvolutionWebhookEvent = {
+          event: 'CHATS_UPSERT',
+          instance,
+          data: chatData
+        }
+        await handleChatsUpsert(supabase, chatEvent)
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error in handleChatsSet:', error)
+  }
+}
+
+async function handleChatsDelete(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    const chatId = data.id
+    
+    console.log('🗑️ Chat delete for instance:', instance, 'Chat ID:', chatId)
+    
+    if (!chatId) {
+      console.log('⚠️ No chat ID found in delete event')
+      return
+    }
+
+    const contactId = chatId.replace('@s.whatsapp.net', '').replace('@g.us', '')
+
+    // Find the WhatsApp instance
+    const { data: whatsappInstance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('id, user_id')
+      .eq('instance_key', instance)
+      .single()
+
+    if (instanceError || !whatsappInstance) {
+      console.error('❌ WhatsApp instance not found:', instance)
+      return
+    }
+
+    // Mark conversation as deleted/archived
+    const { error } = await supabase
+      .from('conversations')
+      .update({
+        status: 'archived',
+        archived_at: new Date().toISOString(),
+        last_synced_at: new Date().toISOString()
+      })
+      .eq('user_id', whatsappInstance.user_id)
+      .eq('integration_type', 'whatsapp')
+      .eq('contact_id', contactId)
+      .eq('integration_id', whatsappInstance.id)
+
+    if (error) {
+      console.error('❌ Error archiving conversation:', error)
+    } else {
+      console.log('✅ Conversation archived')
+    }
+  } catch (error) {
+    console.error('❌ Error in handleChatsDelete:', error)
+  }
+}
+
+async function handleGroupsUpsert(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('👥 Groups upsert for instance:', instance)
+    
+    // Handle group creation/update similar to chats
+    await handleChatsUpsert(supabase, {
+      ...event,
+      event: 'CHATS_UPSERT'
+    })
+  } catch (error) {
+    console.error('❌ Error in handleGroupsUpsert:', error)
+  }
+}
+
+async function handleGroupUpdate(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('👥 Group update for instance:', instance)
+    
+    // Handle group updates similar to chat updates
+    await handleChatsUpdate(supabase, {
+      ...event,
+      event: 'CHATS_UPDATE'
+    })
+  } catch (error) {
+    console.error('❌ Error in handleGroupUpdate:', error)
+  }
+}
+
+async function handleGroupParticipantsUpdate(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    const { id, participants, action } = data
+    
+    console.log('👥 Group participants update for instance:', instance, 'Action:', action)
+    
+    const contactId = id.replace('@g.us', '')
+
+    // Find the WhatsApp instance
+    const { data: whatsappInstance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('id, user_id')
+      .eq('instance_key', instance)
+      .single()
+
+    if (instanceError || !whatsappInstance) {
+      console.error('❌ WhatsApp instance not found:', instance)
+      return
+    }
+
+    // Update conversation metadata with participant info
+    const { error } = await supabase
+      .from('conversations')
+      .update({
+        contact_metadata: {
+          isGroup: true,
+          remoteJid: id,
+          participants,
+          lastParticipantUpdate: {
+            action,
+            participants,
+            timestamp: new Date().toISOString()
+          }
+        },
+        last_synced_at: new Date().toISOString()
+      })
+      .eq('user_id', whatsappInstance.user_id)
+      .eq('integration_type', 'whatsapp')
+      .eq('contact_id', contactId)
+      .eq('integration_id', whatsappInstance.id)
+
+    if (error) {
+      console.error('❌ Error updating group participants:', error)
+    } else {
+      console.log('✅ Group participants updated')
+    }
+  } catch (error) {
+    console.error('❌ Error in handleGroupParticipantsUpdate:', error)
+  }
+}
+
+async function handleCall(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('📞 Call event for instance:', instance)
+    
+    // Log call events for analytics
+    const { error } = await supabase
+      .from('conversation_analytics')
+      .upsert({
+        conversation_id: null, // We don't have conversation context for calls
+        total_calls: 1,
+        last_call_at: new Date().toISOString(),
+        metadata: {
+          callData: data,
+          instance
+        }
+      })
+
+    if (error) {
+      console.error('❌ Error logging call event:', error)
+    } else {
+      console.log('✅ Call event logged')
+    }
+  } catch (error) {
+    console.error('❌ Error in handleCall:', error)
+  }
+}
+
+async function handleNewJwtToken(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('🔑 New JWT token for instance:', instance)
+    
+    // Update instance with new token info (don't store the actual token)
+    const { error } = await supabase
+      .from('whatsapp_instances')
+      .update({
+        metadata: {
+          tokenRefreshedAt: new Date().toISOString(),
+          tokenInfo: {
+            // Don't store the actual token for security
+            refreshed: true,
+            timestamp: new Date().toISOString()
+          }
+        },
+        last_connected_at: new Date().toISOString()
+      })
+      .eq('instance_key', instance)
+
+    if (error) {
+      console.error('❌ Error updating token info:', error)
+    } else {
+      console.log('✅ Token refresh logged')
+    }
+  } catch (error) {
+    console.error('❌ Error in handleNewJwtToken:', error)
+  }
+}

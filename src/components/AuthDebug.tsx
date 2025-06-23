@@ -29,7 +29,7 @@ const AuthDebug: React.FC = () => {
       } else {
         setResult('Sign up completed but no user data returned');
       }
-    } catch (error) {
+    } catch { // Ignored 
       setResult(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
@@ -53,7 +53,7 @@ const AuthDebug: React.FC = () => {
       } else {
         setResult('Sign in completed but no user data returned');
       }
-    } catch (error) {
+    } catch { // Ignored 
       setResult(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
@@ -74,7 +74,7 @@ const AuthDebug: React.FC = () => {
       } else {
         setResult('Connection successful! No current user.');
       }
-    } catch (error) {
+    } catch { // Ignored 
       setResult(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
@@ -136,7 +136,8 @@ const AuthDebug: React.FC = () => {
           </div>
         )}
         
-        <div className="mt-4 text-xs text-gray-500">
+        <div className="mt-4">
+          <h3 className="text-lg font-semibold mb-2">Environment</h3>
           <p><strong>Supabase URL:</strong> {import.meta.env.VITE_SUPABASE_URL}</p>
           <p><strong>API Key:</strong> {import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20)}...</p>
         </div>

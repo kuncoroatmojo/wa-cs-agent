@@ -152,7 +152,7 @@ export class AIConfigService {
       // })
 
       return true
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error testing AI configuration:', error)
       return false
     }

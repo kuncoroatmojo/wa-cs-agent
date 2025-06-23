@@ -53,8 +53,8 @@ Use this checklist to ensure a successful deployment. Check off each item as you
 - [ ] Repository connected to Vercel
 - [ ] Build settings configured
 - [ ] Environment variables added:
-  - [ ] `VITE_SUPABASE_URL`
-  - [ ] `VITE_SUPABASE_ANON_KEY`
+  - [ ] `SUPABASE_URL`
+  - [ ] `SUPABASE_ANON_KEY`
   - [ ] `VITE_EVOLUTION_API_URL`
   - [ ] `VITE_EVOLUTION_API_KEY`
   - [ ] `VITE_OPENAI_API_KEY`
@@ -206,4 +206,65 @@ SELECT * FROM pg_policies;
 
 **🎉 Congratulations! Your WhatsApp AI Customer Support Assistant is now live!**
 
-*Keep this checklist for future deployments and updates.* 
+*Keep this checklist for future deployments and updates.*
+
+## Environment Variables
+
+### Required Variables
+- [ ] `SUPABASE_URL`
+- [ ] `SUPABASE_ANON_KEY`
+- [ ] `VITE_EVOLUTION_API_URL`
+- [ ] `VITE_EVOLUTION_API_KEY`
+
+### Optional Variables
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` (for migrations and admin operations)
+- [ ] `NODE_ENV`
+- [ ] `VITE_APP_ENV` (development/staging/production)
+
+## Database
+- [ ] Run all migrations
+- [ ] Check RLS policies
+- [ ] Verify table constraints
+- [ ] Test user authentication
+
+## Evolution API
+- [ ] Instance is running
+- [ ] API key is valid
+- [ ] Webhook URL is configured
+- [ ] Test connection
+
+## Frontend
+- [ ] Build succeeds locally
+- [ ] All environment variables are set
+- [ ] Static assets are served correctly
+- [ ] Routes work as expected
+
+## Testing
+- [ ] Run unit tests
+- [ ] Run integration tests
+- [ ] Test WhatsApp connection
+- [ ] Test chat functionality
+- [ ] Verify file uploads
+
+## Monitoring
+- [ ] Error tracking is configured
+- [ ] Performance monitoring is set up
+- [ ] Database monitoring is active
+- [ ] API monitoring is enabled
+
+## Security
+- [ ] SSL/TLS is enabled
+- [ ] API keys are secured
+- [ ] RLS policies are active
+- [ ] CORS is configured properly
+
+## Backup
+- [ ] Database backup is configured
+- [ ] File storage backup is set up
+- [ ] Disaster recovery plan is in place
+
+## Documentation
+- [ ] API documentation is updated
+- [ ] Deployment guide is current
+- [ ] Environment variables are documented
+- [ ] Known issues are documented 

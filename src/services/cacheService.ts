@@ -77,7 +77,6 @@ export class CacheService {
     const stats = this.stats.get(namespace)
     
     if (!cache || !stats) {
-      console.warn(`Cache namespace '${namespace}' not found`)
       return null
     }
 
@@ -124,7 +123,6 @@ export class CacheService {
     const stats = this.stats.get(namespace)
     
     if (!cache || !config || !stats) {
-      console.warn(`Cache namespace '${namespace}' not found`)
       return false
     }
 
@@ -229,7 +227,7 @@ export class CacheService {
           this.set(namespace, key, value)
         })
       }
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error preloading cache:', error)
     }
   }
@@ -254,7 +252,7 @@ export class CacheService {
       const value = await fetcher()
       this.set(namespace, key, value, customTTL)
       return value
-    } catch (error) {
+    } catch { // Ignored 
       console.error(`Error fetching data for cache key ${key}:`, error)
       throw error
     }
@@ -338,7 +336,7 @@ export class CacheService {
           this.set(namespace, target.key, data)
         }
       }
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error warming cache:', error)
     }
   }
@@ -366,7 +364,7 @@ export class CacheService {
 
       // Local invalidation
       keys.forEach(key => this.delete(namespace, key))
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error broadcasting cache invalidation:', error)
     }
   }
@@ -400,7 +398,7 @@ export class CacheService {
     try {
       const compressed = this.compressValue(value)
       return this.set(namespace, key, compressed, customTTL)
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error setting compressed cache value:', error)
       return false
     }
@@ -415,7 +413,7 @@ export class CacheService {
       if (compressed === null) return null
       
       return this.decompressValue(compressed)
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error getting compressed cache value:', error)
       return null
     }
@@ -570,7 +568,7 @@ export class CacheService {
         ...(sessions || []).map(s => ({ type: 'session', data: s })),
         ...(documents || []).map(d => ({ type: 'document', data: d }))
       ]
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error analyzing user activity patterns:', error)
       return []
     }

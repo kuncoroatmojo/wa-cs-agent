@@ -37,8 +37,7 @@ export class DocumentService {
       await supabase.functions.invoke('document-process', {
         body: { document_id: data.id }
       })
-    } catch (processingError) {
-      console.warn('Document processing failed to start:', processingError)
+    } catch { // Ignored 
     }
 
     return data

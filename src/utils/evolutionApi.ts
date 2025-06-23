@@ -297,21 +297,17 @@ export const handleWebhookEvent = async (eventType: string, data: any) => {
     switch (eventType) {
       case 'messages.upsert':
         // Handle new messages
-        console.log('New message received:', data);
         break;
       
       case 'connection.update':
         // Handle connection status changes
-        console.log('Connection status changed:', data);
         break;
       
       case 'qrcode.updated':
         // Handle QR code updates
-        console.log('QR code updated:', data);
         break;
       
       default:
-        console.log('Unknown webhook event:', eventType, data);
     }
   } catch (error) {
     console.error('Error handling webhook event:', error);

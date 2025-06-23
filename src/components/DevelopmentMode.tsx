@@ -1,16 +1,31 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../services/supabase';
 
 interface DevelopmentModeProps {
   children: React.ReactNode;
 }
 
 const DevelopmentMode: React.FC<DevelopmentModeProps> = ({ children }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [missingEnvVars, setMissingEnvVars] = useState<string[]>([]);
+
   const isDevelopment = import.meta.env.DEV;
   const hasSupabaseUrl = !!import.meta.env.VITE_SUPABASE_URL;
   const hasSupabaseKey = !!import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const hasEvolutionApiUrl = !!import.meta.env.VITE_EVOLUTION_API_URL;
+  const hasEvolutionApiKey = !!import.meta.env.VITE_EVOLUTION_API_KEY;
+
+  useEffect(() => {
+    const missing = [];
+    if (!hasSupabaseUrl) missing.push('VITE_SUPABASE_URL');
+    if (!hasSupabaseKey) missing.push('VITE_SUPABASE_ANON_KEY');
+    if (!hasEvolutionApiUrl) missing.push('VITE_EVOLUTION_API_URL');
+    if (!hasEvolutionApiKey) missing.push('VITE_EVOLUTION_API_KEY');
+    setMissingEnvVars(missing);
+  }, [hasSupabaseUrl, hasSupabaseKey, hasEvolutionApiUrl, hasEvolutionApiKey]);
 
   // Show development banner if in dev mode and missing env vars
-  const showDevBanner = isDevelopment && (!hasSupabaseUrl || !hasSupabaseKey);
+  const showDevBanner = isDevelopment && (!hasSupabaseUrl || !hasSupabaseKey || !hasEvolutionApiUrl || !hasEvolutionApiKey);
 
   return (
     <>
@@ -30,8 +45,10 @@ const DevelopmentMode: React.FC<DevelopmentModeProps> = ({ children }) => {
               <div className="mt-2 text-xs text-yellow-600">
                 <p>Missing variables:</p>
                 <ul className="list-disc list-inside ml-2">
-                  {!hasSupabaseUrl && <li>VITE_SUPABASE_URL</li>}
-                  {!hasSupabaseKey && <li>VITE_SUPABASE_ANON_KEY</li>}
+                                  {!hasSupabaseUrl && <li>VITE_SUPABASE_URL</li>}
+                {!hasSupabaseKey && <li>VITE_SUPABASE_ANON_KEY</li>}
+                {!hasEvolutionApiUrl && <li>VITE_EVOLUTION_API_URL</li>}
+                {!hasEvolutionApiKey && <li>VITE_EVOLUTION_API_KEY</li>}
                 </ul>
                 <p className="mt-1">
                   Create a <code className="bg-yellow-100 px-1 rounded">.env.local</code> file 

@@ -49,7 +49,7 @@ export const useAIConfigStore = create<AIConfigState>()(
             activeConfig,
             loading: false 
           })
-        } catch (error) {
+        } catch { // Ignored 
           set({
             error: error instanceof Error ? error.message : 'Failed to fetch configurations',
             loading: false
@@ -83,7 +83,7 @@ export const useAIConfigStore = create<AIConfigState>()(
           if (configurations.length === 0) {
             await get().setActiveConfiguration(data.id)
           }
-        } catch (error) {
+        } catch { // Ignored 
           set({
             error: error instanceof Error ? error.message : 'Failed to create configuration',
             loading: false
@@ -115,7 +115,7 @@ export const useAIConfigStore = create<AIConfigState>()(
             activeConfig: activeConfig?.id === id ? data : activeConfig,
             loading: false
           })
-        } catch (error) {
+        } catch { // Ignored 
           set({
             error: error instanceof Error ? error.message : 'Failed to update configuration',
             loading: false
@@ -148,7 +148,7 @@ export const useAIConfigStore = create<AIConfigState>()(
           if (activeConfig?.id === id && updatedConfigurations.length > 0) {
             await get().setActiveConfiguration(updatedConfigurations[0].id)
           }
-        } catch (error) {
+        } catch { // Ignored 
           set({
             error: error instanceof Error ? error.message : 'Failed to delete configuration',
             loading: false
@@ -188,7 +188,7 @@ export const useAIConfigStore = create<AIConfigState>()(
             activeConfig: data,
             loading: false
           })
-        } catch (error) {
+        } catch { // Ignored 
           set({
             error: error instanceof Error ? error.message : 'Failed to set active configuration',
             loading: false
@@ -245,7 +245,7 @@ export const useAIConfigStore = create<AIConfigState>()(
 
           set({ loading: false })
           return true
-        } catch (error) {
+        } catch { // Ignored 
           set({
             error: error instanceof Error ? error.message : 'Configuration test failed',
             loading: false

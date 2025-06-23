@@ -1,0 +1,210 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { evolutionApiService } from '../../../src/services/evolutionApiService';
+
+// Mock fetch globally
+global.fetch = vi.fn();
+
+// Mock the evolutionApiService module
+const mockEvolutionApiService = {
+  setConfig: vi.fn(),
+  getConfig: vi.fn(),
+  createInstance: vi.fn(),
+  deleteInstance: vi.fn(),
+  fetchMessages: vi.fn(),
+  getInstanceStatus: vi.fn(),
+  connectInstance: vi.fn(),
+  setupWebhook: vi.fn()
+};
+
+vi.mock('../../../src/services/evolutionApiService', () => ({
+  evolutionApiService: mockEvolutionApiService
+}));
+
+describe('EvolutionApiService', () => {
+  const mockConfig = {
+    baseUrl: 'https://test-api.com',
+    apiKey: 'test-api-key'
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Setup default Evolution API config
+    evolutionApiService.setConfig(mockConfig);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('createInstance', () => {
+    it('should create a new WhatsApp instance', async () => {
+      const mockResponse = {
+        instance: {
+          instanceName: 'test-instance',
+          status: 'created'
+        }
+      };
+
+      mockEvolutionApiService.createInstance.mockResolvedValue(mockResponse);
+
+      const result = await mockEvolutionApiService.createInstance('test-instance', 'webhook-url');
+
+      expect(mockEvolutionApiService.createInstance).toHaveBeenCalledWith('test-instance', 'webhook-url');
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should handle errors when creating instance', async () => {
+      mockEvolutionApiService.createInstance.mockRejectedValue(new Error('API Error'));
+
+      await expect(mockEvolutionApiService.createInstance('', 'webhook-url'))
+        .rejects.toThrow('API Error');
+    });
+  });
+
+  describe('deleteInstance', () => {
+    it('should delete an instance successfully', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ status: 'deleted' })
+      } as Response);
+
+      await evolutionApiService.deleteInstance('test-instance');
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/instance/delete/test-instance'),
+        expect.objectContaining({
+          method: 'DELETE'
+        })
+      );
+    });
+  });
+
+  describe('fetchMessages', () => {
+    it('should fetch messages for an instance', async () => {
+      const mockMessages = [
+        {
+          key: { id: 'msg-1', remoteJid: '+1234567890@s.whatsapp.net' },
+          message: { conversation: 'Hello' },
+          messageTimestamp: Date.now()
+        }
+      ];
+
+      mockEvolutionApiService.fetchMessages.mockResolvedValue(mockMessages);
+
+      const result = await mockEvolutionApiService.fetchMessages('test-instance');
+
+      expect(mockEvolutionApiService.fetchMessages).toHaveBeenCalledWith('test-instance');
+      expect(result).toEqual(mockMessages);
+    });
+
+    it('should handle empty message response', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([])
+      } as Response);
+
+      const result = await evolutionApiService.fetchMessages('test-instance');
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getInstanceStatus', () => {
+    it('should return instance status', async () => {
+      const mockStatus = {
+        instance: 'test-instance',
+        status: 'open'
+      };
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockStatus)
+      } as Response);
+
+      const result = await evolutionApiService.getInstanceStatus('test-instance');
+
+      expect(result).toEqual(mockStatus);
+    });
+  });
+
+  describe('connectInstance', () => {
+    it('should connect an instance and return QR code', async () => {
+      const mockResponse = {
+        base64: 'qr-code-base64-data',
+        code: 'qr-code-text'
+      };
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResponse)
+      } as Response);
+
+      const result = await evolutionApiService.connectInstance('test-instance');
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/instance/connect/test-instance'),
+        expect.objectContaining({
+          method: 'GET'
+        })
+      );
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  describe('setupWebhook', () => {
+    it('should setup webhook configuration', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ webhook: { url: 'webhook-url' } })
+      } as Response);
+
+      await evolutionApiService.setupWebhook('test-instance', 'webhook-url');
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/webhook/set/test-instance'),
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('webhook-url')
+        })
+      );
+    });
+  });
+
+  describe('error handling', () => {
+    it('should handle network errors', async () => {
+      vi.mocked(fetch).mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(evolutionApiService.fetchMessages('test-instance'))
+        .rejects.toThrow('Network error');
+    });
+
+    it('should handle invalid JSON responses', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.reject(new Error('Invalid JSON'))
+      } as Response);
+
+      await expect(evolutionApiService.fetchMessages('test-instance'))
+        .rejects.toThrow('Invalid JSON');
+    });
+  });
+
+  describe('configuration', () => {
+    it('should set and get configuration', () => {
+      mockEvolutionApiService.setConfig.mockImplementation(() => {});
+      mockEvolutionApiService.getConfig.mockReturnValue(mockConfig);
+
+      mockEvolutionApiService.setConfig(mockConfig);
+      const config = mockEvolutionApiService.getConfig();
+
+      expect(mockEvolutionApiService.setConfig).toHaveBeenCalledWith(mockConfig);
+      expect(config).toEqual(mockConfig);
+    });
+
+    it('should validate configuration before making requests', async () => {
+      evolutionApiService.setConfig({ baseUrl: '', apiKey: '' });
+
+      await expect(evolutionApiService.createInstance('test', 'webhook'))
+        .rejects.toThrow('Evolution API not configured');
+    });
+  });
+}); 

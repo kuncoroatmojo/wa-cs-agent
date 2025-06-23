@@ -68,7 +68,6 @@ export class RAGService {
       // Generate query embedding
       const embedding = await this.generateEmbedding(query, userId)
       if (!embedding) {
-        console.warn('Failed to generate embedding, returning empty results')
         return []
       }
       
@@ -82,7 +81,6 @@ export class RAGService {
 
       if (sourceTypes && sourceTypes.length > 0) {
         // Note: This would require updating the RPC function to support source type filtering
-        console.log('Source type filtering requested:', sourceTypes)
       }
 
       const { data, error } = await rpcQuery
@@ -100,7 +98,7 @@ export class RAGService {
         source_type: item.source_type,
         metadata: item.metadata || {}
       }))
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error in semantic search:', error)
       return []
     }
@@ -186,7 +184,7 @@ export class RAGService {
         responseTimeMs,
         ragContext: ragContextData
       }
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error generating contextual response:', error)
       
       // Fallback response
@@ -421,7 +419,6 @@ export class RAGService {
    */
   private async generateEmbedding(text: string, userId: string): Promise<number[] | null> {
     if (!this.openaiApiKey) {
-      console.warn('No OpenAI API key available for embedding generation')
       return null
     }
 
@@ -444,7 +441,7 @@ export class RAGService {
 
       const data = await response.json()
       return data.data[0]?.embedding || null
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error generating embedding:', error)
       return null
     }
@@ -543,7 +540,7 @@ export class RAGService {
       }
 
       return data
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error in getActiveAIConfig:', error)
       return null
     }
@@ -593,7 +590,7 @@ Response format:
         context_used: ragContext.contextUsed,
         retrieval_query: ragContext.retrievalQuery
       })
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error storing RAG context:', error)
     }
   }
@@ -627,7 +624,7 @@ Response format:
         topics,
         sentiment
       }
-    } catch (error) {
+    } catch { // Ignored 
       console.error('Error in getConversationContext:', error)
       return this.getDefaultConversationContext()
     }

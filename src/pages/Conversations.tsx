@@ -242,10 +242,17 @@ const MessageList: React.FC<MessageListProps> = ({ messages, loading, conversati
       {messages.slice().reverse().map((message) => {
         const isFromMe = message.direction === 'outbound';
         const senderName = isFromMe ? 'You' : (message.sender_name || conversation.contact_name || `+${conversation.contact_id}`);
+        
         // Use external_timestamp when available (actual WhatsApp message time), otherwise created_at
         const timestampToUse = message.external_timestamp || message.created_at;
         
-        // Debug logging
+        // Debug logging - Enhanced
+        console.log(`Message ${message.id.slice(-6)}: 
+          📝 Content: "${message.content.substring(0, 30)}..."
+          🕐 External: ${message.external_timestamp}
+          🕑 Created: ${message.created_at}
+          ✅ Using: ${timestampToUse}
+          📊 Has External: ${!!message.external_timestamp}`);
         
         const messageTime = new Date(timestampToUse).toLocaleTimeString([], { 
           hour: '2-digit', 
@@ -361,7 +368,6 @@ const Conversations: React.FC = () => {
   const loadConversations = async () => {
     try {
       setLoading(true);
-      console.log('📥 Loading unified conversations...');
       
       const filters = {
         status: filterStatus === 'all' ? undefined : filterStatus,
@@ -369,10 +375,9 @@ const Conversations: React.FC = () => {
       };
       
       const unifiedConversations = await conversationService.getAllConversations(profile!.id, filters);
-      console.log('✅ Loaded conversations:', unifiedConversations);
       
       setConversations(unifiedConversations);
-    } catch (error) {
+    } catch { // Ignored 
       console.error('❌ Error loading conversations:', error);
     } finally {
       setLoading(false);
@@ -382,13 +387,11 @@ const Conversations: React.FC = () => {
   const loadMessages = async (conversationId: string) => {
     try {
       setMessagesLoading(true);
-      console.log('📥 Loading messages for conversation:', conversationId);
       
       const conversationMessages = await conversationService.getConversationMessages(conversationId, 50);
-      console.log('✅ Loaded messages:', conversationMessages);
       
       setMessages(conversationMessages);
-    } catch (error) {
+    } catch { // Ignored 
       console.error('❌ Error loading messages:', error);
       setMessages([]);
     } finally {
@@ -400,17 +403,15 @@ const Conversations: React.FC = () => {
     if (!selectedConversation) return;
 
     try {
-      console.log('📤 Sending message:', content);
       
       const sentMessage = await conversationService.sendMessage(selectedConversation.id, content);
-      console.log('✅ Message sent:', sentMessage);
       
       // Add the sent message to the current messages
       setMessages(prev => [...prev, sentMessage]);
       
       // Refresh conversations to update last message
       loadConversations();
-    } catch (error) {
+    } catch { // Ignored 
       console.error('❌ Error sending message:', error);
       // TODO: Show error notification to user
     }
@@ -431,7 +432,7 @@ const Conversations: React.FC = () => {
   });
 
   return (
-    <div className="h-full flex bg-gray-50">
+    <div className="h-screen flex bg-gray-50">
       {/* Conversations Sidebar */}
       <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col min-h-0">
         {/* Search and Filter Header */}
