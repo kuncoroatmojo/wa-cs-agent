@@ -15,7 +15,7 @@ async function testEvolutionSync() {
     const supabaseUrl = 'https://pfirjlhuulkchogjbvsv.supabase.co';
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const evolutionApiUrl = process.env.VITE_EVOLUTION_API_URL;
-    const evolutionApiKey = process.env.VITE_EVOLUTION_API_KEY;
+    const evolutionApiKey = process.env.EVOLUTION_API_KEY;
 
     if (!supabaseServiceKey || !evolutionApiUrl || !evolutionApiKey) {
       console.error('❌ Missing environment variables');

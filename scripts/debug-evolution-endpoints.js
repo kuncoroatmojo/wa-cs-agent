@@ -7,7 +7,7 @@
 import fetch from 'node-fetch';
 
 const EVOLUTION_API_URL = process.env.VITE_EVOLUTION_API_URL;
-const EVOLUTION_API_KEY = process.env.VITE_EVOLUTION_API_KEY;
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 
 if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
   console.error('❌ EVOLUTION_API_URL and EVOLUTION_API_KEY environment variables are required');

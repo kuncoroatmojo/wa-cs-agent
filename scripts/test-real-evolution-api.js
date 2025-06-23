@@ -10,13 +10,13 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = 'https://pfirjlhuulkchogjbvsv.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const EVOLUTION_API_URL = process.env.VITE_EVOLUTION_API_URL;
-const EVOLUTION_API_KEY = process.env.VITE_EVOLUTION_API_KEY;
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 
 if (!SUPABASE_SERVICE_ROLE_KEY || !EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
   console.error('❌ Required environment variables:');
   console.error('  - SUPABASE_SERVICE_ROLE_KEY');
   console.error('  - VITE_EVOLUTION_API_URL');
-  console.error('  - VITE_EVOLUTION_API_KEY');
+  console.error('  - EVOLUTION_API_KEY');
   process.exit(1);
 }
 

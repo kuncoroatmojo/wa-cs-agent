@@ -10,7 +10,7 @@ import fetch from 'node-fetch';
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://pfirjlhuulkchogjbvsv.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const EVOLUTION_API_URL = process.env.VITE_EVOLUTION_API_URL;
-const EVOLUTION_API_KEY = process.env.VITE_EVOLUTION_API_KEY;
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -259,7 +259,7 @@ import fetch from 'node-fetch';
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://pfirjlhuulkchogjbvsv.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const EVOLUTION_API_URL = process.env.VITE_EVOLUTION_API_URL;
-const EVOLUTION_API_KEY = process.env.VITE_EVOLUTION_API_KEY;
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 

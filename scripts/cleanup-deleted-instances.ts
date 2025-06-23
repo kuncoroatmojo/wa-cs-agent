@@ -23,8 +23,8 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
-if (!process.env.VITE_EVOLUTION_API_URL || !process.env.VITE_EVOLUTION_API_KEY) {
-  console.error('❌ Missing required environment variables: VITE_EVOLUTION_API_URL, VITE_EVOLUTION_API_KEY');
+if (!process.env.VITE_EVOLUTION_API_URL || !process.env.EVOLUTION_API_KEY) {
+  console.error('❌ Missing required environment variables: VITE_EVOLUTION_API_URL, EVOLUTION_API_KEY');
   process.exit(1);
 }
 
