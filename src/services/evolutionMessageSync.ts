@@ -351,6 +351,7 @@ export class EvolutionMessageSyncService {
       console.log(`   • Conversations: ${progress.processedConversations}/${progress.totalConversations} processed`);
 
       if (progress.errors.length > 0) {
+        console.warn(`Sync completed with ${progress.errors.length} errors`);
       }
 
     } catch (error) { 

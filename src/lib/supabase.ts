@@ -7,9 +7,13 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Better error handling for missing environment variables
 if (!supabaseUrl) {
+  console.error('VITE_SUPABASE_URL is not defined');
+  // Missing URL handled below
 }
 
 if (!supabaseAnonKey) {
+  console.error('VITE_SUPABASE_ANON_KEY is not defined');
+  // Missing key handled below
 }
 
 if (!supabaseUrl || !supabaseAnonKey) {

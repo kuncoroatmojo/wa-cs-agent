@@ -2,7 +2,6 @@ import { supabase } from '../lib/supabase'
 import { 
   MessagingProviderFactory, 
   ProviderManager,
-  type ProviderType,
   type MessageData,
   type SendMessageOptions 
 } from './messagingProviders'
@@ -38,6 +37,7 @@ export class IntegrationService {
         body: { integration_id: data.id }
       })
     } catch (error) { 
+      console.error('Failed to initialize WhatsApp connection:', error)
     }
 
     return data
@@ -65,6 +65,7 @@ export class IntegrationService {
         body: { integration_id: integrationId }
       })
     } catch (error) { 
+      console.error('Failed to disconnect WhatsApp before deletion:', error)
     }
 
     const { error } = await supabase
@@ -100,6 +101,7 @@ export class IntegrationService {
         body: { integration_id: integrationId }
       })
     } catch (error) { 
+      console.error('Failed to disconnect WhatsApp:', error)
     }
 
     return this.updateWhatsAppIntegration(integrationId, {

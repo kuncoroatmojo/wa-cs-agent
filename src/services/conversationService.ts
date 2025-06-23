@@ -439,6 +439,7 @@ export class ConversationService {
       }
 
       if (errors.length > 0) {
+        console.warn("Sync completed with", errors.length, "errors");
       }
 
       return syncedCount;

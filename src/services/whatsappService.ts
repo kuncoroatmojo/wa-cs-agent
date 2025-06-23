@@ -342,7 +342,8 @@ class WhatsAppService {
             if (evolutionInstance) {
               try {
                 await evolutionApiService.deleteInstance(dbInstance.instance_key);
-              } catch (error) { 
+              } catch (error) {
+                console.error("Failed to delete from Evolution API:", error);
               }
             }
 

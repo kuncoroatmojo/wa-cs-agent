@@ -719,7 +719,8 @@ export class EvolutionApiService {
                         if (directContactInfo?.name || directContactInfo?.pushName) {
                           contactName = (directContactInfo.name || directContactInfo.pushName).trim();
                         }
-                      } catch (error) { 
+                      } catch (error) {
+                        console.error("Failed to get direct contact info:", error);
                       }
                     }
                     
