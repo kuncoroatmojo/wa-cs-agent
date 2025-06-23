@@ -236,6 +236,8 @@ const WhatsAppInstances: React.FC = () => {
                 if (attempts < maxAttempts) {
                   setTimeout(checkStatus, 5000); // Check every 5 seconds
                 } else {
+                  console.warn("Maximum connection attempts reached, stopping monitoring");
+                  console.warn("Maximum connection attempts reached, stopping monitoring");
                 }
                 
               } catch (error) { 
