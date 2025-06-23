@@ -1372,7 +1372,7 @@ WEBHOOK_SECRET=your-webhook-secret
   "outputDirectory": "dist",
   "functions": {
     "app/api/**/*.ts": {
-      "runtime": "nodejs18.x"
+      "runtime": "nodejs20.x"
     }
   },
   "rewrites": [

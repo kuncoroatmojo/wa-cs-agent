@@ -4,6 +4,10 @@
   "version": "1.0.0",
   "description": "Wacanda - RAG-powered AI Customer Service Agent",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "npm run remove-debug-logs && tsc && vite build",

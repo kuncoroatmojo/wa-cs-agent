@@ -5,7 +5,7 @@ Use this checklist to ensure a successful deployment. Check off each item as you
 ## 📋 Pre-Deployment Setup
 
 ### ✅ Environment Setup
-- [ ] **Node.js 18+** installed locally
+- [ ] **Node.js 20+** installed locally
 - [ ] **Git** repository initialized and connected to GitHub
 - [ ] **Vercel CLI** installed (`npm install -g vercel`)
 - [ ] **Supabase CLI** installed (`npm install -g supabase`)

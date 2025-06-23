@@ -574,7 +574,7 @@ WHATWUT_API_KEY=
 ## 🛠️ Development Tools & Setup
 
 ### Required Tools
-- Node.js 18+
+- Node.js 20+
 - Supabase CLI
 - Docker (for local development)
 - ngrok (for webhook testing)
