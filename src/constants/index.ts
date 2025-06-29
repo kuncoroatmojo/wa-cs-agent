@@ -9,7 +9,9 @@ export const API_CONFIG = {
 // AI Providers
 export const AI_PROVIDERS = {
   OPENAI: 'openai',
-  ANTHROPIC: 'anthropic'
+  ANTHROPIC: 'anthropic',
+  GOOGLE: 'google',
+  AZURE: 'azure'
 } as const;
 
 export const AI_MODELS = {
@@ -100,7 +102,10 @@ export const WHATSAPP_CONFIG = {
   QR_CODE_TIMEOUT: 60000, // 1 minute
   RECONNECT_INTERVAL: 30000, // 30 seconds
   MAX_RECONNECT_ATTEMPTS: 5,
-  MESSAGE_DELAY: 1000 // 1 second between messages
+  MESSAGE_DELAY: 1000, // 1 second between messages
+  TARGET_INSTANCE: (typeof import.meta !== 'undefined' && import.meta.env.VITE_WHATSAPP_TARGET_INSTANCE) || 
+                  (typeof process !== 'undefined' && process.env.VITE_WHATSAPP_TARGET_INSTANCE) || 
+                  'istn'
 } as const;
 
 // Subscription Tiers

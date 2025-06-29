@@ -7,10 +7,21 @@ export default defineConfig(({ mode }) => {
   // Load env file based on mode
   const env = loadEnv(mode, process.cwd(), '')
 
+  // Ensure environment variables are properly stringified
+  const envWithProcessPrefix = {
+    'process.env': Object.entries(env).reduce((prev, [key, val]) => {
+      return {
+        ...prev,
+        [key]: val,
+      }
+    }, {}),
+  }
+
   return {
     plugins: [react()],
     envPrefix: ['VITE_', 'SUPABASE_'],  // Allow both VITE_ and SUPABASE_ prefixes
     define: {
+      ...envWithProcessPrefix,  // Make env vars available as process.env.X
       'import.meta.env.VITE_WHATSAPP_TARGET_INSTANCE': JSON.stringify(env.VITE_WHATSAPP_TARGET_INSTANCE || 'istn'),
     },
     resolve: {
