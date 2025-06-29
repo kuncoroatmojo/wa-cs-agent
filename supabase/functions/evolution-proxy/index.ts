@@ -28,7 +28,7 @@ serve(async (req) => {
       method: req.method,
       headers: {
         "Content-Type": "application/json",
-        "apikey": EVOLUTION_API_KEY!
+        "apikey": req.headers.get("apikey") || EVOLUTION_API_KEY!
       },
       body: req.method !== "GET" ? await req.text() : undefined
     });
@@ -83,7 +83,7 @@ router.post("/", async (ctx) => {
       method,
       headers: {
         "Content-Type": "application/json",
-        "apikey": evolutionApiKey,
+        "apikey": ctx.request.headers.get("apikey") || evolutionApiKey,
       },
       body: requestBody ? JSON.stringify(requestBody) : undefined,
     });
