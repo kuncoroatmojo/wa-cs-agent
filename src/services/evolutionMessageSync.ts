@@ -274,16 +274,13 @@ export class EvolutionMessageSyncService {
       }
 
       // Get user for conversations
-      const { data: profiles } = await this.supabase
-        .from('profiles')
-        .select('id')
-        .limit(1);
-
-      if (!profiles || profiles.length === 0) {
-        throw new Error('No user profiles found');
+      const { data: { user } } = await this.supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('No authenticated user found. Please log in to sync messages.');
       }
 
-      const userId = profiles[0].id;
+      const userId = user.id;
       const instanceId = dbInstances.id;
 
       // Fetch all messages from Evolution API (this is the single source of truth)
