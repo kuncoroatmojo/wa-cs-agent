@@ -57,9 +57,9 @@ const app = new Application();
 const router = new Router();
 
 router.options("/", (ctx) => {
-  ctx.response.headers.set("Access-Control-Allow-Origin", "*");
-  ctx.response.headers.set("Access-Control-Allow-Headers", "authorization, x-client-info, apikey, content-type");
-  ctx.response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    ctx.response.headers.set(key, value);
+  });
   ctx.response.status = 200;
 });
 

@@ -175,8 +175,7 @@ export class EvolutionApiService {
       const response = await fetch(fullUrl, {
         method,
         headers,
-        body: body ? JSON.stringify(body) : undefined,
-        credentials: 'include'  // Include cookies for Supabase auth
+        body: body ? JSON.stringify(body) : undefined
       });
 
       if (!response.ok) {
