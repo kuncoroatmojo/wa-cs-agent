@@ -1,9 +1,8 @@
-import { supabase } from '../lib/supabase';
+import { supabase, edgeFunctions } from '../lib/supabase';
 import type { Conversation, WhatsAppInstance } from '../types';
 import { ConversationService } from './conversationService';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
-import { edgeFunctions } from '../lib/supabase';
 
 export interface EvolutionApiConfig {
   baseUrl: string;
@@ -171,7 +170,7 @@ export class EvolutionApiService {
       
       const edgeFunctionUrl = isDev 
         ? 'http://localhost:54321/functions/v1/evolution-proxy'
-        : `${import.meta.env.SUPABASE_URL}/functions/v1/evolution-proxy`;
+        : `${edgeFunctions}/functions/v1/evolution-proxy`;
       
       const fullUrl = `${edgeFunctionUrl}${endpoint}`;
       
@@ -187,18 +186,18 @@ export class EvolutionApiService {
       }
 
       const response = await fetch(fullUrl, {
-        method,
-        headers,
+      method,
+      headers,
         body: body ? JSON.stringify(body) : undefined
-      });
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
+    if (!response.ok) {
+      const errorText = await response.text();
         console.error(`❌ Evolution API error: ${response.status} ${response.statusText}`, errorText);
         throw new Error(`Evolution API error: ${response.status} ${response.statusText}\n${errorText}`);
-      }
+    }
 
-      return response;
+    return response;
     } catch (error) { 
       console.error('Evolution API request failed:', error);
       throw error;
