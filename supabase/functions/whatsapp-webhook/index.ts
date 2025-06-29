@@ -52,6 +52,7 @@ serve(async (req) => {
   }
 
   try {
+    // Use service role key for webhook processing (bypasses RLS for webhook events)
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -139,6 +140,15 @@ serve(async (req) => {
       case 'NEW_JWT_TOKEN':
         await handleNewJwtToken(supabase, webhookEvent)
         break
+      case 'LOGOUT_INSTANCE':
+        await handleLogoutInstance(supabase, webhookEvent)
+        break
+      case 'REMOVE_INSTANCE':
+        await handleRemoveInstance(supabase, webhookEvent)
+        break
+      case 'LABELS_ASSOCIATION':
+        await handleLabelsAssociation(supabase, webhookEvent)
+        break
       default:
         console.log(`⚠️ Unhandled webhook event type: ${webhookEvent.event}`)
     }
@@ -181,7 +191,14 @@ async function handleMessageUpsert(supabase: any, event: EvolutionWebhookEvent) 
     const isGroup = key.remoteJid.includes('@g.us')
     
     // Determine contact name with fallbacks
-    let contactName = pushName || data.verifiedName || data.notifyName || contactId;
+    let contactName = contactId
+    if (isGroup) {
+      // For groups, try to get the group name from the chat data
+      contactName = data.groupMetadata?.subject || `Group ${contactId}`
+    } else {
+      // For individual chats, use pushName with fallbacks
+      contactName = pushName || data.verifiedName || data.notifyName || contactId
+    }
 
     // Check for existing conversation using external_conversation_id and instance_key first
     const { data: existingConversations } = await supabase
@@ -288,7 +305,7 @@ async function handleMessageUpsert(supabase: any, event: EvolutionWebhookEvent) 
         content: messageContent,
         message_type: unifiedMessageType,
         direction: key.fromMe ? 'outbound' : 'inbound',
-        sender_type: key.fromMe ? 'bot' : 'contact',
+        sender_type: key.fromMe ? 'agent' : 'contact', // Changed from 'bot' to 'agent' for consistency
         sender_name: pushName,
         sender_id: key.fromMe ? instance : key.remoteJid,
         status: 'delivered',
@@ -304,7 +321,18 @@ async function handleMessageUpsert(supabase: any, event: EvolutionWebhookEvent) 
       return
     }
 
-    console.log('✅ Message processed successfully')
+    // Update conversation with latest message preview (consistent with sync service)
+    await supabase
+      .from('conversations')
+      .update({
+        last_message_at: new Date(messageTimestamp * 1000).toISOString(),
+        last_message_preview: messageContent.substring(0, 100),
+        last_message_from: key.fromMe ? 'agent' : 'contact',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', conversation.id)
+
+    console.log('✅ Message processed and conversation preview updated')
 
     // Create sync event for tracking
     await supabase
@@ -517,7 +545,7 @@ async function sendWhatsAppBaileys(
     success: true,
     messageId: `baileys_${Date.now()}`
   }
-}
+} 
 
 async function handleContactsUpdate(supabase: any, event: EvolutionWebhookEvent) {
   try {
@@ -640,6 +668,16 @@ async function handleChatsUpsert(supabase: any, event: EvolutionWebhookEvent) {
     const contactId = id.replace('@s.whatsapp.net', '').replace('@g.us', '')
     const isGroup = id.includes('@g.us')
 
+    // Determine contact name
+    let contactName = contactId
+    if (isGroup) {
+      // For groups, use the group subject/name
+      contactName = data.subject || name || `Group ${contactId}`
+    } else {
+      // For individual chats, use the contact name
+      contactName = name || contactId
+    }
+
     // Upsert conversation
     const { error: upsertError } = await supabase
       .from('conversations')
@@ -649,7 +687,7 @@ async function handleChatsUpsert(supabase: any, event: EvolutionWebhookEvent) {
         integration_id: whatsappInstance.id,
         instance_key: instance,
         contact_id: contactId,
-        contact_name: name,
+        contact_name: contactName,
         contact_metadata: {
           isGroup,
           remoteJid: id,
@@ -817,13 +855,20 @@ async function handleMessageDelete(supabase: any, event: EvolutionWebhookEvent) 
       return
     }
 
+    // Get the conversation ID before marking message as deleted
+    const { data: messageToDelete } = await supabase
+      .from('conversation_messages')
+      .select('conversation_id')
+      .eq('external_message_id', messageId)
+      .single()
+
     // Mark message as deleted
     const { error } = await supabase
       .from('conversation_messages')
       .update({
         status: 'deleted',
         deleted_at: new Date().toISOString(),
-        metadata: {
+        external_metadata: {
           ...data,
           deletedBy: 'evolution_api'
         }
@@ -832,9 +877,34 @@ async function handleMessageDelete(supabase: any, event: EvolutionWebhookEvent) 
 
     if (error) {
       console.error('❌ Error marking message as deleted:', error)
-    } else {
-      console.log('✅ Message marked as deleted')
+      return
     }
+
+    // Update conversation preview with the latest non-deleted message
+    if (messageToDelete?.conversation_id) {
+      const { data: latestMessage } = await supabase
+        .from('conversation_messages')
+        .select('content, sender_type, external_timestamp')
+        .eq('conversation_id', messageToDelete.conversation_id)
+        .neq('status', 'deleted')
+        .order('external_timestamp', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (latestMessage) {
+        await supabase
+          .from('conversations')
+          .update({
+            last_message_at: latestMessage.external_timestamp,
+            last_message_preview: latestMessage.content.substring(0, 100),
+            last_message_from: latestMessage.sender_type === 'agent' ? 'agent' : 'contact',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', messageToDelete.conversation_id)
+      }
+    }
+
+    console.log('✅ Message marked as deleted and conversation preview updated')
   } catch (error) {
     console.error('❌ Error in handleMessageDelete:', error)
   }
@@ -1085,5 +1155,117 @@ async function handleNewJwtToken(supabase: any, event: EvolutionWebhookEvent) {
     }
   } catch (error) {
     console.error('❌ Error in handleNewJwtToken:', error)
+  }
+}
+
+async function handleLogoutInstance(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('🚪 Instance logout for:', instance)
+    
+    // Update WhatsApp instance status to disconnected
+    const { error } = await supabase
+      .from('whatsapp_instances')
+      .update({
+        status: 'disconnected',
+        connection_status: 'logout',
+        last_disconnected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('instance_key', instance)
+    
+    if (error) {
+      console.error('❌ Error updating instance logout:', error)
+    } else {
+      console.log('✅ Instance logout processed')
+    }
+  } catch (error) {
+    console.error('❌ Error in handleLogoutInstance:', error)
+  }
+}
+
+async function handleRemoveInstance(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('🗑️ Instance removal for:', instance)
+    
+    // Mark WhatsApp instance as removed (don't delete for audit trail)
+    const { error } = await supabase
+      .from('whatsapp_instances')
+      .update({
+        status: 'removed',
+        connection_status: 'removed',
+        removed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('instance_key', instance)
+    
+    if (error) {
+      console.error('❌ Error updating instance removal:', error)
+    } else {
+      console.log('✅ Instance removal processed')
+    }
+  } catch (error) {
+    console.error('❌ Error in handleRemoveInstance:', error)
+  }
+}
+
+async function handleLabelsAssociation(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('🏷️ Labels association for instance:', instance)
+    
+    // Store label association data for WhatsApp Business features
+    const { error } = await supabase
+      .from('conversation_sync_events')
+      .insert({
+        integration_type: 'whatsapp',
+        event_type: 'labels_association',
+        event_data: {
+          instance,
+          labels: data,
+          timestamp: new Date().toISOString()
+        },
+        processed: true,
+        processed_at: new Date().toISOString()
+      })
+    
+    if (error) {
+      console.error('❌ Error storing labels association:', error)
+    } else {
+      console.log('✅ Labels association processed')
+    }
+  } catch (error) {
+    console.error('❌ Error in handleLabelsAssociation:', error)
+  }
+}
+
+async function handleLabelsEdit(supabase: any, event: EvolutionWebhookEvent) {
+  try {
+    const { instance, data } = event
+    console.log('✏️ Labels edit for instance:', instance)
+    
+    // Store label edit data for WhatsApp Business features
+    const { error } = await supabase
+      .from('conversation_sync_events')
+      .insert({
+        integration_type: 'whatsapp',
+        event_type: 'labels_edit',
+        event_data: {
+          instance,
+          labelChanges: data,
+          timestamp: new Date().toISOString()
+        },
+        processed: true,
+        processed_at: new Date().toISOString()
+      })
+    
+    if (error) {
+      console.error('❌ Error storing labels edit:', error)
+    } else {
+      console.log('✅ Labels edit processed')
+    }
+  } catch (error) {
+    console.error('❌ Error in handleLabelsEdit:', error)
   }
 }

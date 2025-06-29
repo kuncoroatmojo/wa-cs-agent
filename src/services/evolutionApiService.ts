@@ -1,9 +1,9 @@
 import { supabase } from '../lib/supabase';
 import type { Conversation, WhatsAppInstance } from '../types';
 import { ConversationService } from './conversationService';
-import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
+import { edgeFunctions } from '../lib/supabase';
 
 export interface EvolutionApiConfig {
   baseUrl: string;
@@ -95,14 +95,16 @@ export class EvolutionApiService {
 
   // Load configuration from environment variables
   private loadConfigFromEnv() {
-    const envUrl = import.meta.env.VITE_EVOLUTION_API_URL;
-    const envKey = import.meta.env.VITE_EVOLUTION_API_KEY;
+    const baseUrl = import.meta.env.VITE_EVOLUTION_API_URL;
+    const apiKey = import.meta.env.VITE_EVOLUTION_API_KEY;
     
-    if (envUrl && envKey) {
-      this.config = {
-        baseUrl: envUrl,
-        apiKey: envKey
-      };
+    if (baseUrl && apiKey) {
+      this.config = { baseUrl, apiKey };
+      console.log('✅ Loaded Evolution API config from env');
+    } else {
+      console.error('❌ Missing required environment variables:');
+      if (!baseUrl) console.error('- VITE_EVOLUTION_API_URL');
+      if (!apiKey) console.error('- VITE_EVOLUTION_API_KEY');
     }
   }
 
@@ -143,40 +145,70 @@ export class EvolutionApiService {
     }
   }
 
-  // Make HTTP request to Evolution API
+  // Make HTTP request to Evolution API through Vite proxy (dev) or direct (prod)
   private async makeRequest(endpoint: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: any) {
-    if (!this.config) {
-      throw new Error('Evolution API not configured');
+    const evolutionApiKey = this.config?.apiKey || this.apiKey;
+
+    if (!evolutionApiKey) {
+      console.error('❌ Evolution API configuration missing - no API key');
+      throw new Error('Evolution API not properly configured - missing API key');
     }
 
-    const url = `${this.config.baseUrl}${endpoint}`;
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'apikey': this.config.apiKey,
-    };
+    try {
+      // In development, use Vite proxy to avoid CORS issues
+      // In production, make direct requests (CORS should be properly configured)
+      const isDevelopment = import.meta.env.DEV;
+      const fullUrl = isDevelopment 
+        ? `/api/evolution${endpoint}`  // Use Vite proxy in development
+        : `${this.config?.baseUrl || this.baseUrl}${endpoint}`;  // Direct in production
+      
+      console.log(`📡 Making ${method} request to: ${fullUrl} ${isDevelopment ? '(via proxy)' : '(direct)'}`);
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'apikey': evolutionApiKey
+      };
 
+      if (body) {
+        console.log('📦 Request body:', body);
+      }
 
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+      const response = await fetch(fullUrl, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Evolution API error: ${response.status} - ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Evolution API error: ${response.status} ${response.statusText}`, errorText);
+        throw new Error(`Evolution API error: ${response.status} ${response.statusText}\n${errorText}`);
+      }
+
+      return response;
+    } catch (error) { 
+      console.error('Evolution API request failed:', error);
+      throw error;
     }
-
-    return response;
   }
 
   // Fetch all instances from Evolution API
   async fetchInstances(): Promise<EvolutionInstance[]> {
     try {
-      const response = await axios.get(`${this.baseUrl}/instance/fetchInstances`, {
-        headers: this.headers
-      });
-      return response.data.instances || [];
+      const response = await this.makeRequest('/instance/fetchInstances', 'GET');
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch instances: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      const allInstances = result.instances || [];
+      
+      // Filter instances based on target instance configuration
+      const targetInstance = import.meta.env.VITE_WHATSAPP_TARGET_INSTANCE || 'istn';
+      return allInstances.filter((instance: EvolutionInstance) => 
+        instance.instanceName === targetInstance
+      );
     } catch (error) { 
       console.error('Error fetching instances:', error);
       return [];
@@ -209,7 +241,7 @@ export class EvolutionApiService {
       try {
         await this.setupWebhook(instanceName, webhookUrl);
       } catch (error) { 
-        console.error('❌ Failed to set up webhook:', webhookError);
+        console.error('❌ Failed to set up webhook:', error);
         // Don't throw here, we want to return the instance even if webhook setup fails
       }
 
@@ -320,49 +352,77 @@ export class EvolutionApiService {
   }
 
   // Fetch all chats/conversations for an instance
-  async fetchChats(instanceName: string): Promise<EvolutionChat[]> {
+  // Fetch all recent messages and organize them into conversations
+  async fetchAllRecentMessages(instanceName: string, maxMessages: number = 2000): Promise<any[]> {
     try {
+      console.log(`🔄 Fetching all recent messages for instance: ${instanceName} (max: ${maxMessages})`);
       
-      const response = await this.makeRequest(`/chat/findChats/${instanceName}`, 'GET');
+      const allMessages: any[] = [];
+      const pageSize = 50; // Evolution API seems to limit to 50 per request
+      let totalFetched = 0;
+      let pageOffset = 0;
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch chats: ${response.status}`);
-      }
+      while (totalFetched < maxMessages) {
+        const response = await this.makeRequest(`/chat/findMessages/${instanceName}`, 'POST', {
+          where: {},
+          limit: pageSize,
+          offset: pageOffset
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch messages: ${response.status}`);
+        }
 
-      const chats = await response.json();
-      
-      if (!Array.isArray(chats)) {
-        return [];
-      }
-
-      // Map the response to our EvolutionChat type
-      const mappedChats: EvolutionChat[] = chats.map(chat => ({
-        id: chat.id,
-        name: chat.name || chat.contact?.name || chat.contact?.pushName,
-        isGroup: chat.isGroup || false,
-        isWhatsAppBusiness: chat.isWhatsAppBusiness || false,
-        contact: chat.contact ? {
-          id: chat.contact.id,
-          name: chat.contact.name,
-          pushName: chat.contact.pushName,
-          profilePictureUrl: chat.contact.profilePictureUrl
-        } : undefined,
-        lastMessage: chat.lastMessage ? {
-          messageId: chat.lastMessage.key?.id,
-          fromMe: chat.lastMessage.key?.fromMe || false,
-          messageType: this.determineMessageType(chat.lastMessage),
-          messageTimestamp: chat.lastMessage.messageTimestamp,
-          message: {
-            conversation: chat.lastMessage.message?.conversation,
-            extendedTextMessage: chat.lastMessage.message?.extendedTextMessage
+        const result = await response.json();
+        let pageMessages: any[] = [];
+        
+        // Handle the correct response structure: { messages: { records: [...] } }
+        if (result && result.messages && Array.isArray(result.messages.records)) {
+          pageMessages = result.messages.records;
+          console.log(`✅ Page ${Math.floor(pageOffset / pageSize) + 1}: Found ${pageMessages.length} messages (total available: ${result.messages.total})`);
+          
+          // If this is the first page, log total available
+          if (pageOffset === 0) {
+            console.log(`📊 Total messages available: ${result.messages.total}`);
           }
-        } : undefined,
-        unreadCount: chat.unreadCount
-      }));
-
-      return mappedChats;
+        } else if (Array.isArray(result)) {
+          pageMessages = result;
+          console.log(`✅ Page ${Math.floor(pageOffset / pageSize) + 1}: Found ${pageMessages.length} messages`);
+        } else {
+          console.warn('Unexpected messages response format:', result);
+          break;
+        }
+        
+        // If no messages returned, we've reached the end
+        if (pageMessages.length === 0) {
+          console.log(`📄 No more messages found at offset ${pageOffset}`);
+          break;
+        }
+        
+        allMessages.push(...pageMessages);
+        totalFetched += pageMessages.length;
+        pageOffset += pageSize;
+        
+        // If we got fewer messages than requested, we've reached the end
+        if (pageMessages.length < pageSize) {
+          console.log(`📄 Reached end of messages (got ${pageMessages.length} < ${pageSize})`);
+          break;
+        }
+        
+        // Small delay to avoid overwhelming the API
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      console.log(`✅ Fetched ${allMessages.length} total messages for ${instanceName}`);
+      
+      // Sort by timestamp descending to get latest messages first
+      const sortedMessages = allMessages.sort((a: any, b: any) => 
+        (b.messageTimestamp || 0) - (a.messageTimestamp || 0)
+      );
+      
+      return sortedMessages;
     } catch (error) { 
-      console.error('Failed to fetch chats:', error);
+      console.error('Failed to fetch all recent messages:', error);
       return [];
     }
   }
@@ -372,16 +432,23 @@ export class EvolutionApiService {
    */
   async loadConversationMessages(remoteJid: string, instanceName: string): Promise<any[]> {
     try {
+      console.log(`📥 Loading messages for ${remoteJid} from instance ${instanceName}...`);
+
       // First sync messages with our database
       await this.syncMessagesWithDatabase(instanceName, remoteJid);
 
-      // Get messages from our database
-      const { data: conversations } = await supabase
+      // Get conversation ID
+      const { data: conversations, error: convError } = await supabase
         .from('conversations')
         .select('id')
         .eq('external_conversation_id', remoteJid)
         .eq('instance_key', instanceName)
         .limit(1);
+
+      if (convError) {
+        console.error('❌ Error finding conversation:', convError);
+        return [];
+      }
 
       if (!conversations || conversations.length === 0) {
         console.error('❌ No conversation found for', { instanceName, remoteJid });
@@ -390,70 +457,71 @@ export class EvolutionApiService {
 
       const conversation = conversations[0];
 
-      const { data: messages, error } = await supabase
+      // Get messages from our database
+      const { data: messages, error: msgError } = await supabase
         .from('conversation_messages')
         .select('*')
         .eq('conversation_id', conversation.id)
         .order('external_timestamp', { ascending: false })
-        .limit(100);
+        .limit(500); // Increased limit
 
-      if (error) {
-        console.error('❌ Error fetching messages from database:', error);
+      if (msgError) {
+        console.error('❌ Error fetching messages from database:', msgError);
         return [];
       }
 
-      return messages || [];
+      if (!messages || messages.length === 0) {
+        console.log('ℹ️ No messages found in database, trying to sync again...');
+        // Try syncing one more time
+        await this.syncMessagesWithDatabase(instanceName, remoteJid);
+        
+        // Try fetching messages again
+        const { data: retryMessages, error: retryError } = await supabase
+          .from('conversation_messages')
+          .select('*')
+          .eq('conversation_id', conversation.id)
+          .order('external_timestamp', { ascending: false })
+          .limit(500);
+
+        if (retryError) {
+          console.error('❌ Error in retry fetch:', retryError);
+          return [];
+        }
+
+        return retryMessages || [];
+      }
+
+      console.log(`✅ Loaded ${messages.length} messages for ${remoteJid}`);
+      return messages;
     } catch (error) { 
-      console.error('Error loading conversation messages:', error);
+      console.error('❌ Error loading conversation messages:', error);
       return [];
     }
   }
 
   async loadAllMessagesForInstance(instanceName: string): Promise<EvolutionMessage[]> {
     try {
-      // First get all chats
-      const chats = await this.fetchChats(instanceName);
-      if (!chats || chats.length === 0) {
-        return [];
-      }
-
+      // Use the new efficient method to get all recent messages (increased limit with pagination)
+      const messages = await this.fetchAllRecentMessages(instanceName, 500);
       
-      // Use chat/findMessages endpoint to get all messages
-      try {
-        
-        const response = await this.makeRequest(`/chat/findMessages/${instanceName}`, 'POST', {
-          where: {},
-          limit: 100 // Adjust based on your needs
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch messages: ${response.status}`);
-        }
-
-        const messages = await response.json();
-        
-        if (!Array.isArray(messages)) {
-          return [];
-        }
-
-        // Process and organize messages
-        const processedMessages = messages
-          .filter(msg => msg && msg.key && msg.key.remoteJid) // Filter out invalid messages
-          .map(msg => ({
-            ...msg,
-            messageType: this.determineMessageType(msg),
-            messageTimestamp: msg.messageTimestamp || msg.timestamp || 0
-          }));
-
-        // Update cache
-        this.messageCache.set(instanceName, processedMessages);
-        
-        return processedMessages;
-
-      } catch (error) { 
-        console.error(`Failed to fetch messages for instance ${instanceName}:`, error);
+      if (!messages || messages.length === 0) {
         return [];
       }
+
+      // Process and organize messages
+      const processedMessages = messages
+        .filter(msg => msg && msg.key && msg.key.remoteJid) // Filter out invalid messages
+        .map(msg => ({
+          ...msg,
+          messageType: this.determineMessageType(msg),
+          messageTimestamp: msg.messageTimestamp || msg.timestamp || 0
+        }));
+
+      // Update cache
+      this.messageCache.set(instanceName, processedMessages);
+      
+      return processedMessages;
+
     } catch (error) { 
       console.error('Failed to load all messages:', error);
       return [];
@@ -489,71 +557,449 @@ export class EvolutionApiService {
 
   async fetchMessages(instanceName: string, remoteJid: string, limit = 100): Promise<any[]> {
     try {
+      // Use the correct Evolution API endpoint from documentation
       const response = await this.makeRequest(`/chat/findMessages/${instanceName}`, 'POST', {
         where: {
           key: {
-            remoteJid
+            remoteJid: remoteJid
           }
         },
-        limit
+        limit: limit
       });
 
-      return response.ok ? await response.json() : [];
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Failed to fetch messages for ${remoteJid}:`, response.status, errorText);
+        return [];
+      }
+
+      const result = await response.json();
+      
+      // Handle the correct response structure: { messages: { records: [...] } }
+      if (result && result.messages && Array.isArray(result.messages.records)) {
+        console.log(`✅ Fetched ${result.messages.records.length} messages for ${remoteJid}`);
+        return result.messages.records;
+      } else if (Array.isArray(result)) {
+        console.log(`✅ Fetched ${result.length} messages for ${remoteJid}`);
+        return result;
+      } else {
+        console.warn('Unexpected messages response format:', result);
+        return [];
+      }
     } catch (error) { 
-      console.error('Error fetching messages:', error);
+      console.error(`❌ Error fetching messages for ${remoteJid}:`, error);
       return [];
     }
   }
 
   async syncMessagesWithDatabase(instanceName: string, remoteJid: string): Promise<void> {
     try {
+      console.log(`🔄 Syncing messages for ${remoteJid} from instance ${instanceName}...`);
       
-      // Get messages from Evolution API
-      const messages = await this.fetchMessages(instanceName, remoteJid, 100);
+      // Get messages from Evolution API using the correct endpoint
+      const messages = await this.fetchMessages(instanceName, remoteJid, 500); // Increased limit
       
-      // Get the conversation ID from our database
-      const { data: conversation } = await supabase
+      if (!messages || messages.length === 0) {
+        console.log(`ℹ️ No messages found for ${remoteJid}`);
+        return;
+      }
+
+      // Get or create the conversation in our database
+      let conversation;
+      const { data: existingConv } = await supabase
         .from('conversations')
         .select('id')
         .eq('external_conversation_id', remoteJid)
         .eq('instance_key', instanceName)
         .single();
         
-      if (!conversation) {
-        console.error('❌ No conversation found for', { instanceName, remoteJid });
+      if (existingConv) {
+        conversation = existingConv;
+      } else {
+        // Create new conversation if it doesn't exist
+        const { data: user } = await supabase.auth.getUser();
+        if (!user.user) {
+          console.error('❌ No authenticated user found');
+          return;
+        }
+
+        // Check if it's a group chat
+        const isGroup = remoteJid.includes('@g.us');
+        let contactName = remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', '');
+        
+        // For groups, try to get the group name
+        if (isGroup) {
+          const groupMessage = messages.find(m => m.groupMetadata?.subject);
+          if (groupMessage?.groupMetadata?.subject) {
+            contactName = groupMessage.groupMetadata.subject;
+          } else {
+            contactName = `Group ${contactName}`;
+          }
+        } else {
+          // For individual chats, use pushName
+          const messageWithName = messages.find(m => m.pushName);
+          if (messageWithName?.pushName) {
+            contactName = messageWithName.pushName;
+          }
+        }
+
+        const { data: newConv, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            user_id: user.user.id,
+            integration_type: 'whatsapp',
+            instance_key: instanceName,
+            external_conversation_id: remoteJid,
+            contact_id: remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', ''),
+            contact_name: contactName,
+            contact_metadata: {},
+            status: 'active',
+            priority: 'medium',
+            tags: [],
+            message_count: 0,
+            last_message_at: new Date().toISOString(),
+            conversation_topics: [],
+            last_synced_at: new Date().toISOString(),
+            sync_status: 'synced'
+          })
+          .select('id')
+          .single();
+
+        if (convError) {
+          console.error('❌ Error creating conversation:', convError);
+          return;
+        }
+        conversation = newConv;
+      }
+
+      // Convert Evolution messages to our database format and insert them
+      for (const msg of messages) {
+        if (!msg.key?.id) continue;
+
+        // Extract message content
+        let content = '[Media]';
+        let messageType = this.determineMessageType(msg);
+        
+        if (msg.message?.conversation) {
+          content = msg.message.conversation;
+        } else if (msg.message?.extendedTextMessage?.text) {
+          content = msg.message.extendedTextMessage.text;
+        } else if (msg.message?.imageMessage?.caption) {
+          content = msg.message.imageMessage.caption;
+          messageType = 'image';
+        } else if (msg.message?.videoMessage?.caption) {
+          content = msg.message.videoMessage.caption;
+          messageType = 'video';
+        }
+
+        // Check if message already exists
+        const { data: existingMessage } = await supabase
+          .from('conversation_messages')
+          .select('id')
+          .eq('external_message_id', msg.key.id)
+          .single();
+
+        if (!existingMessage) {
+          const { error: msgError } = await supabase
+            .from('conversation_messages')
+            .insert({
+              conversation_id: conversation.id,
+              content,
+              message_type: messageType,
+              direction: msg.key.fromMe ? 'outbound' : 'inbound',
+              sender_type: msg.key.fromMe ? 'bot' : 'contact',
+              sender_name: msg.pushName,
+              sender_id: msg.key.fromMe ? instanceName : msg.key.remoteJid,
+              status: 'delivered',
+              external_message_id: msg.key.id,
+              external_timestamp: new Date(msg.messageTimestamp * 1000).toISOString(),
+              external_metadata: msg,
+              ai_processed: false,
+              media_metadata: {},
+              created_at: new Date(msg.messageTimestamp * 1000).toISOString(),
+              updated_at: new Date().toISOString()
+            });
+
+          if (msgError) {
+            console.error('❌ Error inserting message:', msgError);
+          }
+        }
+      }
+
+      // Update conversation with latest message info
+      const latestMessage = messages[0];
+      if (latestMessage) {
+        const { error: updateError } = await supabase
+          .from('conversations')
+          .update({
+            last_message_at: new Date(latestMessage.messageTimestamp * 1000).toISOString(),
+            last_message_preview: this.extractMessageContent(latestMessage).substring(0, 100),
+            last_message_from: latestMessage.key.fromMe ? 'agent' : 'contact',
+            last_synced_at: new Date().toISOString(),
+            sync_status: 'synced'
+          })
+          .eq('id', conversation.id);
+
+        if (updateError) {
+          console.error('❌ Error updating conversation:', updateError);
+        }
+      }
+
+      console.log(`✅ Successfully synced ${messages.length} messages for ${remoteJid}`);
+    } catch (error) { 
+      console.error(`❌ Error syncing messages for ${remoteJid}:`, error);
+    }
+  }
+
+  // Helper method to extract message content
+  private extractMessageContent(msg: any): string {
+    if (msg.message?.conversation) {
+      return msg.message.conversation;
+    }
+    if (msg.message?.extendedTextMessage?.text) {
+      return msg.message.extendedTextMessage.text;
+    }
+    if (msg.message?.imageMessage?.caption) {
+      return `[Image] ${msg.message.imageMessage.caption}`;
+    }
+    if (msg.message?.videoMessage?.caption) {
+      return `[Video] ${msg.message.videoMessage.caption}`;
+    }
+    if (msg.message?.audioMessage) {
+      return '[Audio Message]';
+    }
+    if (msg.message?.documentMessage) {
+      return `[Document] ${msg.message.documentMessage.fileName || 'Document'}`;
+    }
+    if (msg.message?.stickerMessage) {
+      return '[Sticker]';
+    }
+    if (msg.message?.locationMessage) {
+      return '[Location]';
+    }
+    if (msg.message?.contactMessage) {
+      return '[Contact]';
+    }
+    return '[Message]';
+  }
+
+  // Sync all conversations and their messages for an instance using the efficient approach
+  async syncAllConversationsAndMessages(instanceName: string): Promise<{
+    conversationsSynced: number;
+    messagesSynced: number;
+    errors: string[];
+  }> {
+    try {
+      console.log(`🔄 Starting full sync for instance: ${instanceName}`);
+      
+      // Get all recent messages from Evolution API
+      const allMessages = await this.fetchAllRecentMessages(instanceName, 1000);
+      console.log(`📋 Found ${allMessages.length} messages to process`);
+      
+      if (allMessages.length === 0) {
+        return { conversationsSynced: 0, messagesSynced: 0, errors: [] };
+      }
+      
+      // Group messages by conversation (remoteJid)
+      const conversationMap = new Map<string, any[]>();
+      for (const message of allMessages) {
+        const remoteJid = message.key?.remoteJid;
+        if (remoteJid) {
+          if (!conversationMap.has(remoteJid)) {
+            conversationMap.set(remoteJid, []);
+          }
+          conversationMap.get(remoteJid)!.push(message);
+        }
+      }
+      
+      console.log(`📊 Organized into ${conversationMap.size} conversations`);
+      
+      let conversationsSynced = 0;
+      let messagesSynced = 0;
+      const errors: string[] = [];
+      
+      // Sync each conversation
+      for (const [remoteJid, messages] of conversationMap) {
+        try {
+          console.log(`🔄 Syncing conversation: ${remoteJid} (${messages.length} messages)`);
+          
+          // Sync messages for this conversation
+          await this.syncConversationMessages(instanceName, remoteJid, messages);
+          conversationsSynced++;
+          messagesSynced += messages.length;
+          
+        } catch (error) {
+          const errorMsg = `Failed to sync conversation ${remoteJid}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          console.error('❌', errorMsg);
+          errors.push(errorMsg);
+        }
+      }
+      
+      console.log(`✅ Sync completed for ${instanceName}:`, {
+        conversationsSynced,
+        messagesSynced,
+        errors: errors.length
+      });
+      
+      return {
+        conversationsSynced,
+        messagesSynced,
+        errors
+      };
+      
+    } catch (error) {
+      console.error(`❌ Error syncing all conversations for ${instanceName}:`, error);
+      throw error;
+    }
+  }
+
+  // Sync messages for a specific conversation with pre-fetched messages
+  async syncConversationMessages(instanceName: string, remoteJid: string, messages: any[]): Promise<void> {
+    try {
+      // Get or create the conversation in our database
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        console.error('❌ No authenticated user found');
         return;
       }
 
-      // Convert Evolution messages to our database format
-      const dbMessages = messages.map(msg => ({
-        conversation_id: conversation.id,
-        content: msg.message?.conversation || msg.message?.extendedTextMessage?.text || '',
-        message_type: 'text', // We'll need to handle other types later
-        direction: msg.key.fromMe ? 'outbound' : 'inbound',
-        sender_type: msg.key.fromMe ? 'agent' : 'contact',
-        sender_name: msg.pushName || '',
-        sender_id: msg.key.remoteJid,
-        status: 'delivered', // We'll need proper status mapping later
-        external_message_id: msg.key.id,
-        external_timestamp: new Date(msg.messageTimestamp * 1000).toISOString(),
-        external_metadata: msg
-      }));
-
-      // Insert messages into our database
-      const { error } = await supabase
-        .from('conversation_messages')
-        .upsert(dbMessages, {
-          onConflict: 'external_message_id',
-          ignoreDuplicates: true
-        });
-
-      if (error) {
-        console.error('❌ Error syncing messages:', error);
-        throw error;
+      // Determine if this is a group conversation and get appropriate name
+      const isGroup = remoteJid.endsWith('@g.us');
+      let contactName;
+      
+      if (isGroup) {
+        // For groups, use a generic group name with the group ID
+        contactName = `Group ${remoteJid.split('@')[0]}`;
+      } else {
+        // For individual contacts, use pushName from messages
+        const firstMessage = messages[0];
+        contactName = firstMessage?.pushName || remoteJid.split('@')[0];
       }
 
-    } catch (error) { 
-      console.error('❌ Error in syncMessagesWithDatabase:', error);
+      // Extract contact ID from remoteJid (phone number for WhatsApp)
+      const contactId = remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', '');
+      
+      // Try to find existing conversation (with user_id for RLS policy)
+      const { data: existingConvs } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('user_id', user.user.id)
+        .eq('external_conversation_id', remoteJid)
+        .eq('instance_key', instanceName)
+        .limit(1);
+      
+      const existingConv = existingConvs && existingConvs.length > 0 ? existingConvs[0] : null;
+        
+      let conversation;
+      if (existingConv) {
+        conversation = existingConv;
+        
+        // Update conversation name if it's a group (preview will be updated after message insertion)
+        if (isGroup) {
+          await supabase
+            .from('conversations')
+            .update({
+              contact_name: contactName
+            })
+            .eq('id', existingConv.id);
+          console.log(`📝 Updated existing group conversation: ${remoteJid} -> ${contactName}`);
+        } else {
+          console.log(`📝 Found existing conversation: ${remoteJid}`);
+        }
+      } else {
+        // Find the latest message for preview
+        const latestMessage = messages.reduce((latest, current) => 
+          (current.messageTimestamp || 0) > (latest.messageTimestamp || 0) ? current : latest
+        );
+        const latestMessagePreview = this.extractMessageContent(latestMessage).substring(0, 100);
+        const latestMessageFrom = latestMessage.key?.fromMe ? 'agent' : 'contact';
+
+        // Use upsert to handle potential duplicates
+        const { data: newConv, error: convError } = await supabase
+          .from('conversations')
+          .upsert({
+            user_id: user.user.id,
+            external_conversation_id: remoteJid,
+            instance_key: instanceName,
+            integration_type: 'whatsapp', // Required field for WhatsApp conversations
+            contact_id: contactId, // Required field - phone number or group ID
+            contact_name: contactName,
+            last_message_at: new Date(Math.max(...messages.map(m => (m.messageTimestamp || 0) * 1000))).toISOString(),
+            last_message_preview: latestMessagePreview,
+            last_message_from: latestMessageFrom
+          }, {
+            onConflict: 'external_conversation_id'
+          })
+          .select('id')
+          .single();
+
+        if (convError) {
+          console.error('❌ Error upserting conversation:', convError);
+          return;
+        }
+        conversation = newConv;
+        console.log(`✅ Created/updated conversation: ${remoteJid} -> ${contactName}`);
+      }
+
+      // Insert messages into database
+      const messagesToInsert = messages.map(msg => ({
+        conversation_id: conversation.id,
+        external_message_id: msg.key?.id,
+        content: this.extractMessageContent(msg),
+        message_type: this.determineMessageType(msg),
+        direction: msg.key?.fromMe ? 'outbound' : 'inbound',
+        sender_type: msg.key?.fromMe ? 'agent' : 'contact',
+        sender_name: msg.key?.fromMe ? 'Agent' : (msg.pushName || null),
+        sender_id: msg.key?.fromMe ? 'agent' : remoteJid,
+        external_timestamp: new Date((msg.messageTimestamp || 0) * 1000).toISOString(),
+        external_metadata: {
+          pushName: msg.pushName,
+          messageType: msg.messageType,
+          source: msg.source,
+          participant: msg.participant
+        }
+      }));
+
+      // Batch insert messages (handle duplicates)
+      for (const messageData of messagesToInsert) {
+        try {
+          await supabase
+            .from('conversation_messages')
+            .upsert(messageData, {
+              onConflict: 'external_message_id'
+            });
+        } catch (error) {
+          console.warn(`⚠️ Failed to insert message ${messageData.external_message_id}:`, error);
+        }
+      }
+
+      // After inserting all messages, update the conversation with the truly latest message
+      // Get the actual latest message from the database (not just from the current batch)
+      const { data: latestMessage } = await supabase
+        .from('conversation_messages')
+        .select('content, sender_type, external_timestamp')
+        .eq('conversation_id', conversation.id)
+        .order('external_timestamp', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (latestMessage) {
+        await supabase
+          .from('conversations')
+          .update({
+            last_message_at: latestMessage.external_timestamp,
+            last_message_preview: latestMessage.content.substring(0, 100),
+            last_message_from: latestMessage.sender_type === 'agent' ? 'agent' : 'contact'
+          })
+          .eq('id', conversation.id);
+        
+        console.log(`✅ Synced ${messagesToInsert.length} messages for conversation ${remoteJid} - Updated preview: "${latestMessage.content.substring(0, 50)}..."`);
+      } else {
+        console.log(`✅ Synced ${messagesToInsert.length} messages for conversation ${remoteJid}`);
+      }
+      
+    } catch (error) {
+      console.error(`❌ Error syncing conversation ${remoteJid}:`, error);
       throw error;
     }
   }
@@ -627,14 +1073,9 @@ export class EvolutionApiService {
               };
             }
             
-            // 2. Get chat list for contact names (optional, for better contact info)
-            const chats = await this.fetchChats(instance.instance_key);
-            
-            // Create a map of remoteJid to chat info for quick lookup
+            // 2. Since we're using message-driven approach, we'll extract contact info from messages
+            // No need to fetch chats separately
             const chatMap = new Map<string, any>();
-            chats.forEach(chat => {
-              chatMap.set(chat.id, chat);
-            });
             
             // 3. Build conversations from messages (message-driven approach)
             const conversationMap = new Map<string, {

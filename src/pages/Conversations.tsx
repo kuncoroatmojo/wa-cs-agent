@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
-import { conversationService, type UnifiedConversation, type UnifiedMessage } from '../services/conversationService'
+import { conversationService, type UnifiedConversation } from '../services/conversationService'
+import { supabase } from '../lib/supabase'
+import type { UnifiedMessage } from '../types'
 import { 
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
@@ -340,96 +342,143 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, disabled }) 
 };
 
 const Conversations: React.FC = () => {
-  const { profile } = useAuthStore();
-  const [conversations, setConversations] = useState<UnifiedConversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<UnifiedConversation | null>(null);
-  const [messages, setMessages] = useState<UnifiedMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'resolved'>('all');
+  const { profile } = useAuthStore()
+  const [conversations, setConversations] = useState<UnifiedConversation[]>([])
+  const [selectedConversation, setSelectedConversation] = useState<UnifiedConversation | null>(null)
+  const [messages, setMessages] = useState<UnifiedMessage[]>([])
+  const [loading, setLoading] = useState(true)
+  const [sendingMessage, setSendingMessage] = useState(false)
+  const [messagesLoading, setMessagesLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'resolved'>('all')
 
-  // Load conversations on component mount
+  // Load initial data
   useEffect(() => {
     if (profile) {
-      loadConversations();
+      loadConversations()
     }
-  }, [profile]);
+  }, [profile])
 
-  // Load messages when conversation is selected
+  // Set up real-time subscriptions
   useEffect(() => {
+    if (!profile) return
+
+    // Subscribe to conversation changes
+    const conversationSubscription = supabase
+      .channel('conversation-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations',
+          filter: `user_id=eq.${profile.id}`
+        },
+        async (payload) => {
+          console.log('🔄 Conversation change received:', payload)
+          // Reload conversations to get the latest state
+          await loadConversations()
+        }
+      )
+      .subscribe()
+
+    // Subscribe to message changes for the selected conversation
+    let messageSubscription: any
     if (selectedConversation) {
-      loadMessages(selectedConversation.id);
-    } else {
-      setMessages([]);
+      messageSubscription = supabase
+        .channel('message-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'conversation_messages',
+            filter: `conversation_id=eq.${selectedConversation.id}`
+          },
+          async (payload) => {
+            console.log('🔄 Message change received:', payload)
+            // Reload messages to get the latest state
+            await loadMessages(selectedConversation.id)
+          }
+        )
+        .subscribe()
     }
-  }, [selectedConversation]);
+
+    // Cleanup subscriptions
+    return () => {
+      conversationSubscription.unsubscribe()
+      if (messageSubscription) {
+        messageSubscription.unsubscribe()
+      }
+    }
+  }, [profile, selectedConversation?.id])
 
   const loadConversations = async () => {
     try {
-      setLoading(true);
+      setLoading(true)
       
       const filters = {
         status: filterStatus === 'all' ? undefined : filterStatus,
         limit: 100
-      };
+      }
       
-      const unifiedConversations = await conversationService.getAllConversations(profile!.id, filters);
+      const unifiedConversations = await conversationService.getAllConversations(profile!.id, filters)
       
-      setConversations(unifiedConversations);
+      setConversations(unifiedConversations)
     } catch (error) { 
-      console.error('❌ Error loading conversations:', error);
+      console.error('❌ Error loading conversations:', error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const loadMessages = async (conversationId: string) => {
     try {
-      setMessagesLoading(true);
+      setMessagesLoading(true)
       
-      const conversationMessages = await conversationService.getConversationMessages(conversationId, 50);
+      const conversationMessages = await conversationService.getConversationMessages(conversationId, 50)
       
-      setMessages(conversationMessages);
+      setMessages(conversationMessages)
     } catch (error) { 
-      console.error('❌ Error loading messages:', error);
-      setMessages([]);
+      console.error('❌ Error loading messages:', error)
+      setMessages([])
     } finally {
-      setMessagesLoading(false);
+      setMessagesLoading(false)
     }
-  };
+  }
 
   const handleSendMessage = async (content: string) => {
-    if (!selectedConversation) return;
+    if (!selectedConversation) return
 
     try {
       
-      const sentMessage = await conversationService.sendMessage(selectedConversation.id, content);
+      const sentMessage = await conversationService.sendMessage(selectedConversation.id, content)
       
       // Add the sent message to the current messages
-      setMessages(prev => [...prev, sentMessage]);
+      setMessages(prev => [...prev, sentMessage])
       
       // Refresh conversations to update last message
-      loadConversations();
+      loadConversations()
     } catch (error) { 
-      console.error('❌ Error sending message:', error);
+      console.error('❌ Error sending message:', error)
       // TODO: Show error notification to user
     }
-  };
+  }
 
   const handleSelectConversation = (conversation: UnifiedConversation) => {
-    setSelectedConversation(conversation);
-  };
-
+    setSelectedConversation(conversation)
+    // Load messages when selecting a conversation
+    loadMessages(conversation.id)
+  }
 
   const filteredConversations = conversations.filter(conv => {
     const matchesSearch = searchTerm === '' || 
       conv.contact_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       conv.contact_id.includes(searchTerm) ||
-      conv.last_message_preview?.toLowerCase().includes(searchTerm.toLowerCase());
+      conv.last_message_preview?.toLowerCase().includes(searchTerm.toLowerCase())
     
-    return matchesSearch;
-  });
+    return matchesSearch
+  })
 
   return (
     <div className="h-screen flex bg-gray-50">
