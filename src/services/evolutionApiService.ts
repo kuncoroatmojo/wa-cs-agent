@@ -170,7 +170,7 @@ export class EvolutionApiService {
       
       const edgeFunctionUrl = isDev 
         ? 'http://localhost:54321/functions/v1/evolution-proxy'
-        : `${edgeFunctions}/functions/v1/evolution-proxy`;
+        : `${edgeFunctions}/evolution-proxy`;
       
       const fullUrl = `${edgeFunctionUrl}${endpoint}`;
       
