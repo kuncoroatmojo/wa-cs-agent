@@ -23,20 +23,23 @@ serve(async (req) => {
     const url = new URL(req.url);
     const targetEndpoint = url.pathname.replace("/evolution-proxy", "");
     
+    // Get API key from header or environment
+    const apiKey = req.headers.get("apikey") || EVOLUTION_API_KEY;
+    
     // Forward the request to Evolution API
     const response = await fetch(`${EVOLUTION_API_URL}${targetEndpoint}`, {
       method: req.method,
       headers: {
         "Content-Type": "application/json",
-        "apikey": req.headers.get("apikey") || EVOLUTION_API_KEY || ''
+        "Authorization": apiKey // Evolution API expects the key in Authorization header
       },
       body: req.method !== "GET" ? await req.text() : undefined
     });
 
-    // Check if we have a valid API key
-    if (!req.headers.get("apikey") && !EVOLUTION_API_KEY) {
+    // Handle Evolution API response
+    if (response.status === 401) {
       return new Response(
-        JSON.stringify({ error: "Missing Evolution API key" }),
+        JSON.stringify({ error: "Invalid or missing Evolution API key" }),
         { 
           status: 401,
           headers: {
@@ -55,6 +58,7 @@ serve(async (req) => {
         ...corsHeaders,
         "Content-Type": "application/json",
       },
+      status: response.status
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), {

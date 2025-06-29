@@ -89,8 +89,8 @@ export class EvolutionApiService {
 
   private get headers() {
     return {
-      'Content-Type': 'application/json',
-      'apikey': this.apiKey
+      "Content-Type": "application/json",
+      "Authorization": this.apiKey
     };
   }
 
@@ -174,8 +174,8 @@ export class EvolutionApiService {
       console.log(`📡 Making ${method} request to: ${fullUrl} (via ${isDevelopment ? 'Vite proxy' : 'Edge Function'})`);
       
       const headers = {
-        'Content-Type': 'application/json',
-        'apikey': evolutionApiKey
+        "Content-Type": "application/json",
+        "Authorization": evolutionApiKey
       };
 
       if (body) {
