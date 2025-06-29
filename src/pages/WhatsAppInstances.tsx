@@ -42,9 +42,33 @@ const WhatsAppInstances: React.FC = () => {
     }
   }, [fetchInstances, isEvolutionConfigured, syncEvolutionInstances]);
 
+  // Show target instance info
+  const targetInstanceInfo = React.useMemo(() => {
+    const targetInstance = WHATSAPP_CONFIG.TARGET_INSTANCE;
+    if (!targetInstance) {
+      return (
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
+          <h3 className="text-yellow-800 font-medium">⚠️ No Target Instance Configured</h3>
+          <p className="text-yellow-700 text-sm mt-1">
+            Please set the VITE_WHATSAPP_TARGET_INSTANCE environment variable.
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+        <h3 className="text-blue-800 font-medium">🎯 Target Instance: {targetInstance}</h3>
+        <p className="text-blue-700 text-sm mt-1">
+          This environment is configured to only show and manage the "{targetInstance}" instance.
+        </p>
+      </div>
+    );
+  }, []);
+
   // Combine database instances with Evolution API instances and filter by target instance
   const allInstances = React.useMemo(() => {
     const targetInstance = WHATSAPP_CONFIG.TARGET_INSTANCE;
+    if (!targetInstance) return [];
     
     // Filter database instances to only show the target instance
     const dbInstances = instances.filter(instance => 
@@ -57,7 +81,7 @@ const WhatsAppInstances: React.FC = () => {
     const missingEvolutionInstances = evolutionInstances
       .filter(evo => evo.instanceName === targetInstance && !evolutionInstanceNames.has(evo.instanceName))
       .map(evo => ({
-        id: `evolution_${evo.instanceName}`,
+        id: `evolution-${evo.instanceName}`,
         name: evo.instanceName,
         status: evo.status?.toLowerCase() === 'open' ? 'connected' as const : 
                evo.status?.toLowerCase() === 'connecting' ? 'connecting' as const : 'disconnected' as const,
@@ -81,24 +105,6 @@ const WhatsAppInstances: React.FC = () => {
 
     return [...dbInstances, ...missingEvolutionInstances];
   }, [instances, evolutionInstances, profile]);
-
-  // Show target instance info at the top
-  const targetInstance = WHATSAPP_CONFIG.TARGET_INSTANCE;
-  const targetInstanceInfo = (
-    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-      <h2 className="text-lg font-semibold text-blue-800 mb-2">
-        🎯 Target Instance: {targetInstance}
-      </h2>
-      <p className="text-sm text-blue-600">
-        This environment is configured to only show and manage the "{targetInstance}" instance.
-        {allInstances.length === 0 && (
-          <span className="block mt-2 text-amber-600">
-            ⚠️ The target instance has not been created yet. Click "Create Instance" to set it up.
-          </span>
-        )}
-      </p>
-    </div>
-  );
 
   const handleCreateInstance = async (name: string, connectionType: 'baileys' | 'cloud_api' | 'evolution_api') => {
     if (!profile) return;

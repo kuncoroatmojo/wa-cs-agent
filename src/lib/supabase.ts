@@ -26,6 +26,9 @@ export const supabase = createClient<SupabaseDatabase>(supabaseUrl, supabaseAnon
 // Auth helpers
 export const auth = supabase.auth;
 
+// Edge Functions URL helper
+export const edgeFunctions = supabaseUrl.replace('.supabase.co', '.functions.supabase.co');
+
 // Real-time subscriptions helper
 export const subscribeToTable = (
   table: keyof SupabaseDatabase['public']['Tables'],
@@ -311,7 +314,7 @@ export interface Database {
 }
 
 // Edge Functions helper
-export const edgeFunctions = {
+export const edgeFunctionsHelper = {
   invoke: async <T = any>(functionName: string, data?: any): Promise<{ data: T | null; error: any }> => {
     try {
       const { data: result, error } = await supabase.functions.invoke(functionName, {
