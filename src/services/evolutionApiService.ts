@@ -145,7 +145,7 @@ export class EvolutionApiService {
     }
   }
 
-  // Make HTTP request to Evolution API through Vite proxy (dev) or direct (prod)
+  // Make HTTP request to Evolution API through proxy
   private async makeRequest(endpoint: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: any) {
     const evolutionApiKey = this.config?.apiKey || this.apiKey;
 
@@ -155,14 +155,13 @@ export class EvolutionApiService {
     }
 
     try {
-      // In development, use Vite proxy to avoid CORS issues
-      // In production, make direct requests (CORS should be properly configured)
+      // Use Vite proxy in development, Supabase Edge Function in production
       const isDevelopment = import.meta.env.DEV;
       const fullUrl = isDevelopment 
-        ? `/api/evolution${endpoint}`  // Use Vite proxy in development
-        : `${this.config?.baseUrl || this.baseUrl}${endpoint}`;  // Direct in production
+        ? `/api/evolution${endpoint}`  // Vite proxy in development
+        : `${edgeFunctions}/evolution-proxy${endpoint}`;  // Supabase Edge Function in production
       
-      console.log(`📡 Making ${method} request to: ${fullUrl} ${isDevelopment ? '(via proxy)' : '(direct)'}`);
+      console.log(`📡 Making ${method} request to: ${fullUrl} (via ${isDevelopment ? 'Vite proxy' : 'Edge Function'})`);
       
       const headers = {
         'Content-Type': 'application/json',
@@ -368,8 +367,8 @@ export class EvolutionApiService {
           limit: pageSize,
           offset: pageOffset
         });
-        
-        if (!response.ok) {
+      
+      if (!response.ok) {
           throw new Error(`Failed to fetch messages: ${response.status}`);
         }
 
@@ -485,8 +484,8 @@ export class EvolutionApiService {
 
         if (retryError) {
           console.error('❌ Error in retry fetch:', retryError);
-          return [];
-        }
+      return [];
+    }
 
         return retryMessages || [];
       }
@@ -495,7 +494,7 @@ export class EvolutionApiService {
       return messages;
     } catch (error) { 
       console.error('❌ Error loading conversation messages:', error);
-      return [];
+        return [];
     }
   }
 
@@ -505,22 +504,22 @@ export class EvolutionApiService {
       const messages = await this.fetchAllRecentMessages(instanceName, 500);
       
       if (!messages || messages.length === 0) {
-        return [];
-      }
+          return [];
+        }
 
-      // Process and organize messages
-      const processedMessages = messages
-        .filter(msg => msg && msg.key && msg.key.remoteJid) // Filter out invalid messages
-        .map(msg => ({
-          ...msg,
-          messageType: this.determineMessageType(msg),
-          messageTimestamp: msg.messageTimestamp || msg.timestamp || 0
-        }));
+        // Process and organize messages
+        const processedMessages = messages
+          .filter(msg => msg && msg.key && msg.key.remoteJid) // Filter out invalid messages
+          .map(msg => ({
+            ...msg,
+            messageType: this.determineMessageType(msg),
+            messageTimestamp: msg.messageTimestamp || msg.timestamp || 0
+          }));
 
-      // Update cache
-      this.messageCache.set(instanceName, processedMessages);
-      
-      return processedMessages;
+        // Update cache
+        this.messageCache.set(instanceName, processedMessages);
+        
+        return processedMessages;
 
     } catch (error) { 
       console.error('Failed to load all messages:', error);
@@ -620,8 +619,8 @@ export class EvolutionApiService {
         const { data: user } = await supabase.auth.getUser();
         if (!user.user) {
           console.error('❌ No authenticated user found');
-          return;
-        }
+        return;
+      }
 
         // Check if it's a group chat
         const isGroup = remoteJid.includes('@g.us');
@@ -703,16 +702,16 @@ export class EvolutionApiService {
           const { error: msgError } = await supabase
             .from('conversation_messages')
             .insert({
-              conversation_id: conversation.id,
+        conversation_id: conversation.id,
               content,
               message_type: messageType,
-              direction: msg.key.fromMe ? 'outbound' : 'inbound',
+        direction: msg.key.fromMe ? 'outbound' : 'inbound',
               sender_type: msg.key.fromMe ? 'bot' : 'contact',
               sender_name: msg.pushName,
               sender_id: msg.key.fromMe ? instanceName : msg.key.remoteJid,
               status: 'delivered',
-              external_message_id: msg.key.id,
-              external_timestamp: new Date(msg.messageTimestamp * 1000).toISOString(),
+        external_message_id: msg.key.id,
+        external_timestamp: new Date(msg.messageTimestamp * 1000).toISOString(),
               external_metadata: msg,
               ai_processed: false,
               media_metadata: {},
@@ -964,7 +963,7 @@ export class EvolutionApiService {
       for (const messageData of messagesToInsert) {
         try {
           await supabase
-            .from('conversation_messages')
+        .from('conversation_messages')
             .upsert(messageData, {
               onConflict: 'external_message_id'
             });
@@ -997,8 +996,8 @@ export class EvolutionApiService {
       } else {
         console.log(`✅ Synced ${messagesToInsert.length} messages for conversation ${remoteJid}`);
       }
-      
-    } catch (error) {
+
+    } catch (error) { 
       console.error(`❌ Error syncing conversation ${remoteJid}:`, error);
       throw error;
     }

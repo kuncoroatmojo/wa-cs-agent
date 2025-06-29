@@ -9,6 +9,7 @@ import { evolutionApiService } from '../services/evolutionApiService';
 import { conversationService } from '../services/conversationService';
 import { toast } from 'react-hot-toast';
 import type { WhatsAppInstance } from '../types';
+import { WHATSAPP_CONFIG } from '../constants';
 
 const WhatsAppInstances: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -41,14 +42,20 @@ const WhatsAppInstances: React.FC = () => {
     }
   }, [fetchInstances, isEvolutionConfigured, syncEvolutionInstances]);
 
-  // Combine database instances with Evolution API instances
+  // Combine database instances with Evolution API instances and filter by target instance
   const allInstances = React.useMemo(() => {
-    const dbInstances = instances;
+    const targetInstance = WHATSAPP_CONFIG.TARGET_INSTANCE;
+    
+    // Filter database instances to only show the target instance
+    const dbInstances = instances.filter(instance => 
+      instance.name === targetInstance || instance.instanceKey === targetInstance
+    );
+    
     const evolutionInstanceNames = new Set(dbInstances.filter(i => i.connectionType === 'evolution_api').map(i => i.instanceKey));
     
-    // Add Evolution API instances that aren't in the database yet
+    // Add Evolution API instances that aren't in the database yet (only the target instance)
     const missingEvolutionInstances = evolutionInstances
-      .filter(evo => !evolutionInstanceNames.has(evo.instanceName))
+      .filter(evo => evo.instanceName === targetInstance && !evolutionInstanceNames.has(evo.instanceName))
       .map(evo => ({
         id: `evolution_${evo.instanceName}`,
         name: evo.instanceName,
@@ -75,8 +82,33 @@ const WhatsAppInstances: React.FC = () => {
     return [...dbInstances, ...missingEvolutionInstances];
   }, [instances, evolutionInstances, profile]);
 
+  // Show target instance info at the top
+  const targetInstance = WHATSAPP_CONFIG.TARGET_INSTANCE;
+  const targetInstanceInfo = (
+    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      <h2 className="text-lg font-semibold text-blue-800 mb-2">
+        🎯 Target Instance: {targetInstance}
+      </h2>
+      <p className="text-sm text-blue-600">
+        This environment is configured to only show and manage the "{targetInstance}" instance.
+        {allInstances.length === 0 && (
+          <span className="block mt-2 text-amber-600">
+            ⚠️ The target instance has not been created yet. Click "Create Instance" to set it up.
+          </span>
+        )}
+      </p>
+    </div>
+  );
+
   const handleCreateInstance = async (name: string, connectionType: 'baileys' | 'cloud_api' | 'evolution_api') => {
     if (!profile) return;
+
+    // Enforce target instance name
+    const targetInstance = WHATSAPP_CONFIG.TARGET_INSTANCE;
+    if (name !== targetInstance) {
+      toast.error(`Instance name must be "${targetInstance}" for this environment`);
+      return;
+    }
 
     const result = await createInstance({
       name,
@@ -292,28 +324,29 @@ const WhatsAppInstances: React.FC = () => {
       });
       
       
-      // Use only the optimized sync approach - conversations are derived from messages
+      // Use the improved sync approach with proper Evolution API endpoints
       if (instance.connectionType === 'evolution_api') {
-        console.log('📨 Syncing all messages from Evolution API (conversations auto-created)...');
+        console.log('📨 Syncing all conversations and messages from Evolution API...');
         
-        const result = await conversationService.syncAllMessagesForRAG(profile.id, instance.instanceKey);
+        // Use the new direct sync method
+        const result = await evolutionApiService.syncAllConversationsAndMessages(instance.instanceKey);
         
         if (result.errors.length > 0) {
           toast.success(
-            `Sync completed! ${result.totalMessagesSynced} messages from ${result.totalConversations} conversations (${result.errors.length} errors)`,
+            `Sync completed! ${result.messagesSynced} messages from ${result.conversationsSynced} conversations (${result.errors.length} errors)`,
             { id: `sync-${instance.id}`, duration: 8000 }
           );
         } else {
           toast.success(
-            `🎉 Sync complete! ${result.totalMessagesSynced} messages from ${result.totalConversations} conversations`,
+            `🎉 Sync complete! ${result.messagesSynced} messages from ${result.conversationsSynced} conversations`,
             { id: `sync-${instance.id}`, duration: 6000 }
           );
         }
         
         console.log(`📊 Final sync results:`, {
           instance: instance.name,
-          conversations: result.totalConversations,
-          messages: result.totalMessagesSynced,
+          conversations: result.conversationsSynced,
+          messages: result.messagesSynced,
           errors: result.errors.length
         });
       } else {
@@ -403,71 +436,43 @@ const WhatsAppInstances: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="md:flex md:items-center md:justify-between">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-            WhatsApp Instances
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage your WhatsApp connections and bot instances
-          </p>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700">Evolution API:</span>
-            {isEvolutionConfigured ? (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                ✅ Configured ({evolutionInstances.length} instances)
-              </span>
-            ) : (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                ⚠️ Not configured
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="mt-4 flex gap-3 md:mt-0 md:ml-4">
+    <div className="container mx-auto px-4 py-8">
+      {/* Show target instance info */}
+      {targetInstanceInfo}
+
+      {/* Rest of the component */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">WhatsApp Instances</h1>
+        <div className="flex gap-2">
+          {/* Only show create button if no instances exist */}
+          {allInstances.length === 0 && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Create Instance
+            </button>
+          )}
           <button
-            type="button"
-            onClick={() => window.location.href = '/settings'}
-            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
-          >
-            API Configuration
-          </button>
-          <button
-            type="button"
             onClick={handleCleanup}
-            className="btn-primary"
-            disabled={isLoading}
+            className="text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg border border-gray-300 hover:border-gray-400 transition-colors"
           >
-            {isLoading ? 'Cleaning...' : 'Cleanup Stale Instances'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowCreateModal(true)}
-            className="btn-primary"
-          >
-            Create New Instance
+            Cleanup Stale
           </button>
         </div>
       </div>
 
-      {/* Error Message */}
+      {/* Show loading state */}
+      {isLoading && (
+        <div className="flex justify-center items-center py-12">
+          <LoadingSpinner />
+        </div>
+      )}
+
+      {/* Show error state */}
       {error && (
-        <div className="rounded-md bg-red-50 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error</h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p>{error}</p>
-              </div>
-            </div>
-          </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-800">{error}</p>
         </div>
       )}
 
@@ -615,8 +620,8 @@ interface CreateInstanceModalProps {
 }
 
 const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({ onClose, onCreate }) => {
-  const [name, setName] = useState('');
-  const [connectionType, setConnectionType] = useState<'baileys' | 'cloud_api' | 'evolution_api'>('baileys');
+  const [name, setName] = useState(WHATSAPP_CONFIG.TARGET_INSTANCE);
+  const [connectionType, setConnectionType] = useState<'baileys' | 'cloud_api' | 'evolution_api'>('evolution_api');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -633,17 +638,21 @@ const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({ onClose, onCr
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                Instance Name
+                Instance Name (Environment Locked)
               </label>
               <input
                 type="text"
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
                 placeholder="Enter instance name"
                 required
+                readOnly
               />
+              <p className="mt-1 text-xs text-gray-500">
+                This environment is configured to only use the "{WHATSAPP_CONFIG.TARGET_INSTANCE}" instance
+              </p>
             </div>
             <div className="mb-4">
               <label htmlFor="connectionType" className="block text-sm font-medium text-gray-700 mb-2">
