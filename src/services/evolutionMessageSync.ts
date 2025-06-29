@@ -567,9 +567,9 @@ export class EvolutionMessageSyncService {
                       await this.supabase
                         .from('conversation_messages')
                         .insert(message);
-                    } catch (error) { 
-                      if (!individualError.message.includes('duplicate') && !individualError.message.includes('unique')) {
-                        console.error(`❌ Failed to insert individual message ${message.external_message_id}:`, individualError.message);
+                    } catch (individualError: any) { 
+                      if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
+                        console.error(`❌ Failed to insert individual message ${message.external_message_id}:`, individualError?.message || individualError);
                       }
                       // Skip duplicates silently
                     }
@@ -578,8 +578,8 @@ export class EvolutionMessageSyncService {
                   throw insertError;
                 }
               }
-            } catch (error) { 
-              console.error(`❌ Failed to insert chunk for ${remoteJid}:`, chunkError.message);
+            } catch (error: any) { 
+              console.error(`❌ Failed to insert chunk for ${remoteJid}:`, error?.message || error);
               // Continue with next chunk
             }
           }
