@@ -78,11 +78,12 @@ export class EvolutionApiService {
 
   constructor(baseUrl?: string, apiKey?: string) {
     // Allow injection of baseUrl and apiKey for scripts
-    this.baseUrl = baseUrl || (typeof window !== 'undefined' ? import.meta.env.VITE_EVOLUTION_API_URL : process.env.VITE_EVOLUTION_API_URL) || '';
-    this.apiKey = apiKey || (typeof window !== 'undefined' ? import.meta.env.VITE_EVOLUTION_API_KEY : process.env.VITE_EVOLUTION_API_KEY) || '';
+    this.baseUrl = baseUrl || '';
+    this.apiKey = apiKey || '';
 
+    // Load config from environment if not provided
     if (!this.baseUrl || !this.apiKey) {
-      throw new Error('Missing Evolution API configuration');
+      this.loadConfigFromEnv();
     }
   }
 
@@ -95,16 +96,20 @@ export class EvolutionApiService {
 
   // Load configuration from environment variables
   private loadConfigFromEnv() {
-    const baseUrl = import.meta.env.VITE_EVOLUTION_API_URL;
-    const apiKey = import.meta.env.VITE_EVOLUTION_API_KEY;
+    // Try both import.meta.env and process.env
+    const baseUrl = (typeof window !== 'undefined' ? import.meta.env.VITE_EVOLUTION_API_URL : process.env.VITE_EVOLUTION_API_URL) || '';
+    const apiKey = (typeof window !== 'undefined' ? import.meta.env.VITE_EVOLUTION_API_KEY : process.env.VITE_EVOLUTION_API_KEY) || '';
     
     if (baseUrl && apiKey) {
+      this.baseUrl = baseUrl;
+      this.apiKey = apiKey;
       this.config = { baseUrl, apiKey };
       console.log('✅ Loaded Evolution API config from env');
     } else {
       console.error('❌ Missing required environment variables:');
       if (!baseUrl) console.error('- VITE_EVOLUTION_API_URL');
       if (!apiKey) console.error('- VITE_EVOLUTION_API_KEY');
+      throw new Error('Missing Evolution API configuration');
     }
   }
 
@@ -147,6 +152,11 @@ export class EvolutionApiService {
 
   // Make HTTP request to Evolution API through proxy
   private async makeRequest(endpoint: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: any) {
+    // Always ensure we have a valid API key
+    if (!this.apiKey && !this.config?.apiKey) {
+      this.loadConfigFromEnv();
+    }
+
     const evolutionApiKey = this.config?.apiKey || this.apiKey;
 
     if (!evolutionApiKey) {

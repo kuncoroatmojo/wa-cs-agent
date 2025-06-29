@@ -28,10 +28,24 @@ serve(async (req) => {
       method: req.method,
       headers: {
         "Content-Type": "application/json",
-        "apikey": req.headers.get("apikey") || EVOLUTION_API_KEY!
+        "apikey": req.headers.get("apikey") || EVOLUTION_API_KEY || ''
       },
       body: req.method !== "GET" ? await req.text() : undefined
     });
+
+    // Check if we have a valid API key
+    if (!req.headers.get("apikey") && !EVOLUTION_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "Missing Evolution API key" }),
+        { 
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+    }
 
     const data = await response.json();
 
