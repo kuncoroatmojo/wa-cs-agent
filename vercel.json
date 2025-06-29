@@ -5,30 +5,10 @@
   "outputDirectory": "dist",
   "installCommand": "npm ci",
   "devCommand": "npm run dev",
-  "routes": [
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ],
-  "headers": [
+  "rewrites": [
     {
       "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        }
-      ]
+      "destination": "/index.html"
     }
-  ],
-  "trailingSlash": false,
-  "cleanUrls": true
+  ]
 }
