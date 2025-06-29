@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Unknown",
+    "phone": "6281321249433@c.us",
+    "status": "DRY_RUN_SUCCESS",
+    "response": {
+      "success": true,
+      "dryRun": true
+    }
+  },
+  {
+    "name": "Unknown",
+    "phone": "628112224272@c.us",
+    "status": "DRY_RUN_SUCCESS",
+    "response": {
+      "success": true,
+      "dryRun": true
+    }
+  },
+  {
+    "name": "Unknown",
+    "phone": "628561566687@c.us",
+    "status": "DRY_RUN_SUCCESS",
+    "response": {
+      "success": true,
+      "dryRun": true
+    }
+  },
+  {
+    "name": "Unknown",
+    "phone": "6281287502645@c.us",
+    "status": "DRY_RUN_SUCCESS",
+    "response": {
+      "success": true,
+      "dryRun": true
+    }
+  }
+]

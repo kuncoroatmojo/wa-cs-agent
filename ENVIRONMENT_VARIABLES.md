@@ -20,6 +20,9 @@ Your `.env` or `.env.local` file should contain:
 VITE_EVOLUTION_API_URL=https://your-evolution-api-url.com
 VITE_EVOLUTION_API_KEY=your-api-key
 
+# WhatsApp Instance Configuration
+VITE_WHATSAPP_TARGET_INSTANCE=istn
+
 # Supabase Configuration
 VITE_SUPABASE_URL=your-supabase-url
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
@@ -33,6 +36,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 // Use VITE_ prefixed variables (required for browser access)
 const apiUrl = import.meta.env.VITE_EVOLUTION_API_URL;
 const apiKey = import.meta.env.VITE_EVOLUTION_API_KEY;
+const targetInstance = import.meta.env.VITE_WHATSAPP_TARGET_INSTANCE;
 ```
 
 ### In Node.js Scripts (scripts/)
@@ -40,6 +44,7 @@ const apiKey = import.meta.env.VITE_EVOLUTION_API_KEY;
 // Use the same VITE_ variables for consistency
 const EVOLUTION_API_URL = process.env.VITE_EVOLUTION_API_URL;
 const EVOLUTION_API_KEY = process.env.VITE_EVOLUTION_API_KEY;
+const TARGET_INSTANCE = process.env.VITE_WHATSAPP_TARGET_INSTANCE;
 ```
 
 ## Summary of Changes

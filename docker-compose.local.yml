@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: evolution_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: evolution
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: evolution123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - evolution-network
+
+  # Redis Cache
+  redis:
+    image: redis:alpine
+    container_name: evolution_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - evolution-network
+
+  # Evolution API
+  evolution-api:
+    image: atendai/evolution-api:v2.1.1
+    container_name: evolution_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      # Server Configuration
+      - SERVER_TYPE=http
+      - SERVER_PORT=8080
+      - CORS_ORIGIN=*
+      - CORS_METHODS=POST,GET,PUT,DELETE
+      - CORS_CREDENTIALS=true
+      
+      # Logging
+      - LOG_LEVEL=ERROR
+      - LOG_COLOR=true
+      - LOG_BAILEYS=error
+      
+      # Database Configuration
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://evolution:evolution123@postgres:5432/evolution
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution_api
+      
+      # Redis Configuration
+      - REDIS_ENABLED=true
+      - REDIS_URI=redis://redis:6379
+      
+      # Authentication
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=local-dev-api-key-12345678
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+      
+      # QR Code Settings
+      - QRCODE_LIMIT=30
+      - QRCODE_COLOR=#198754
+      
+      # Webhook Settings (optional for local development)
+      - WEBHOOK_GLOBAL_URL=http://localhost:5173/api/webhook
+      - WEBHOOK_GLOBAL_ENABLED=false
+      - WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS=false
+      
+      # Session Configuration
+      - CONFIG_SESSION_PHONE_CLIENT=Evolution API
+      - CONFIG_SESSION_PHONE_NAME=Chrome
+      - CONFIG_SESSION_PHONE_VERSION=2.3000.1023204200
+      
+      # Instance Settings
+      - DEL_INSTANCE=false
+      - DEL_TEMP_INSTANCES=true
+      
+      # Storage Settings
+      - STORE_MESSAGES=true
+      - STORE_MESSAGE_UP=true
+      - STORE_CONTACTS=true
+      - STORE_CHATS=true
+      
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+      - evolution_logs:/evolution/logs
+    networks:
+      - evolution-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  evolution-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  evolution_instances:
+  evolution_store:
+  evolution_logs: 

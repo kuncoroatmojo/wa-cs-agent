@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  edge-runtime:
+    image: supabase/edge-runtime:latest
+    ports:
+      - "54321:54321"
+    environment:
+      - SUPABASE_URL=${VITE_SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - EVOLUTION_API_URL=${VITE_EVOLUTION_API_URL}
+      - EVOLUTION_API_KEY=${VITE_EVOLUTION_API_KEY}
+    volumes:
+      - ./supabase/functions:/home/deno/functions 

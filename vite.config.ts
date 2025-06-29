@@ -49,21 +49,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
-      host: true,
-      proxy: {
-        '/api/evolution': {
-          target: 'https://evo.istn.ac.id',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/evolution/, ''),
-          configure: (proxy) => {
-            proxy.on('proxyReq', (proxyReq) => {
-              // Remove CORS headers from proxy request
-              proxyReq.removeHeader('Origin');
-              proxyReq.removeHeader('Referer');
-            });
-          }
-        }
-      }
+      host: true
     },
     preview: {
       port: 4173,

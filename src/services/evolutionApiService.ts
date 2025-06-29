@@ -152,7 +152,7 @@ export class EvolutionApiService {
 
   // Make HTTP request to Evolution API through proxy
   private async makeRequest(endpoint: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: any) {
-    // Always ensure we have a valid API key
+    // Always ensure we have a valid API key (using apikey header)
     if (!this.apiKey && !this.config?.apiKey) {
       this.loadConfigFromEnv();
     }
@@ -165,17 +165,21 @@ export class EvolutionApiService {
     }
 
     try {
-      // Use Vite proxy in development, Supabase Edge Function in production
-      const isDevelopment = import.meta.env.DEV;
-      const fullUrl = isDevelopment 
-        ? `/api/evolution${endpoint}`  // Vite proxy in development
-        : `${edgeFunctions}/evolution-proxy${endpoint}`;  // Supabase Edge Function in production
+      // Use local Edge Function in development
+      const isDev = import.meta.env.DEV || window.location.hostname === 'localhost';
+      console.log(`🔍 Environment detection - DEV: ${import.meta.env.DEV}, hostname: ${window.location.hostname}, isDev: ${isDev}`);
       
-      console.log(`📡 Making ${method} request to: ${fullUrl} (via ${isDevelopment ? 'Vite proxy' : 'Edge Function'})`);
+      const edgeFunctionUrl = isDev 
+        ? 'http://localhost:54321/functions/v1/evolution-proxy'
+        : `${import.meta.env.SUPABASE_URL}/functions/v1/evolution-proxy`;
+      
+      const fullUrl = `${edgeFunctionUrl}${endpoint}`;
+      
+      console.log(`📡 Making ${method} request to: ${fullUrl}${isDev ? ' (via local edge function)' : ' (via Edge Function)'}`);
       
       const headers = {
         "Content-Type": "application/json",
-        "Authorization": evolutionApiKey
+        "apikey": evolutionApiKey
       };
 
       if (body) {
@@ -211,7 +215,7 @@ export class EvolutionApiService {
       }
       
       const result = await response.json();
-      const allInstances = result.instances || [];
+      const allInstances = result.instances || result || [];
       
       // Filter instances based on target instance configuration
       const targetInstance = import.meta.env.VITE_WHATSAPP_TARGET_INSTANCE || 'istn';
