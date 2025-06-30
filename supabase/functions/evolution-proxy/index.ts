@@ -1,8 +1,8 @@
 // Supabase Edge Function for Evolution API proxy
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL");
-const EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY");
+const EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL") || "https://evo.istn.ac.id";
+const EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY") || "YGyPcZ5tn8RfmaATbP5ou9bOP4Usc7Pk4G0k04p9G7iNMpWqbNhga2FOl6T7ud26";
 
 serve(async (req) => {
   // Set up CORS headers with dynamic origin
@@ -19,9 +19,25 @@ serve(async (req) => {
   }
 
   try {
+    // Validate required environment variables
+    if (!EVOLUTION_API_URL) {
+      return new Response(
+        JSON.stringify({ error: "Evolution API URL not configured" }),
+        { 
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+    }
+
     // Get the target endpoint from the URL
     const url = new URL(req.url);
-    const targetEndpoint = url.pathname.replace("/evolution-proxy", "");
+    const targetEndpoint = url.pathname
+      .replace("/functions/v1/evolution-proxy", "")
+      .replace("/evolution-proxy", "");
     
     // Get API key from header or environment
     const apiKey = req.headers.get("apikey") || EVOLUTION_API_KEY;

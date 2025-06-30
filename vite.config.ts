@@ -18,42 +18,42 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [react()],
-    envPrefix: ['VITE_', 'SUPABASE_'],  // Allow both VITE_ and SUPABASE_ prefixes
+  plugins: [react()],
+  envPrefix: ['VITE_', 'SUPABASE_'],  // Allow both VITE_ and SUPABASE_ prefixes
     define: {
       ...envWithProcessPrefix,  // Make env vars available as process.env.X
       'import.meta.env.VITE_WHATSAPP_TARGET_INSTANCE': JSON.stringify(env.VITE_WHATSAPP_TARGET_INSTANCE || 'istn'),
     },
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, './src'),
-      },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
     },
-    css: {
-      postcss: './postcss.config.js',
-    },
-    build: {
-      outDir: 'dist',
-      sourcemap: false,
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            router: ['react-router-dom'],
-            ui: ['@headlessui/react', '@heroicons/react'],
-            supabase: ['@supabase/supabase-js'],
-            query: ['@tanstack/react-query'],
-          },
+  },
+  css: {
+    postcss: './postcss.config.js',
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          ui: ['@headlessui/react', '@heroicons/react'],
+          supabase: ['@supabase/supabase-js'],
+          query: ['@tanstack/react-query'],
         },
       },
     },
-    server: {
-      port: 5173,
+  },
+  server: {
+    port: 5173,
       host: true
-    },
-    preview: {
-      port: 4173,
-      host: true,
-    },
+  },
+  preview: {
+    port: 4173,
+    host: true,
+  },
   }
 })

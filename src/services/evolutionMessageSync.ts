@@ -275,7 +275,7 @@ export class EvolutionMessageSyncService {
 
       // Get user for conversations
       const { data: { user } } = await this.supabase.auth.getUser();
-      
+
       if (!user) {
         throw new Error('No authenticated user found. Please log in to sync messages.');
       }
@@ -452,7 +452,7 @@ export class EvolutionMessageSyncService {
       conversation = newConv;
     }
 
-    // Check which messages already exist to avoid duplicates
+    // Check which messages already exist to avoid duplicates (check globally, not per conversation)
     const externalIds = sortedMessages
       .map(msg => msg.key?.id)
       .filter(Boolean);
@@ -462,7 +462,6 @@ export class EvolutionMessageSyncService {
       const { data: existingMessages } = await this.supabase
         .from('conversation_messages')
         .select('external_message_id')
-        .eq('conversation_id', conversation.id)
         .in('external_message_id', externalIds);
       
       existingMessageIds = existingMessages?.map(m => m.external_message_id) || [];
@@ -512,74 +511,48 @@ export class EvolutionMessageSyncService {
         };
       });
 
-      // Try upsert first, but handle constraint issues gracefully
-      let upsertSuccess = false;
-      try {
-        const { error: upsertError, count } = await this.supabase
-          .from('conversation_messages')
-          .upsert(messageInserts, {
-            onConflict: 'external_message_id',
-            ignoreDuplicates: true
-          });
+      // Pre-filter batch messages to check which ones already exist
+      const batchExternalIds = messageInserts.map(m => m.external_message_id);
+      const { data: existingBatchMessages } = await this.supabase
+        .from('conversation_messages')
+        .select('external_message_id')
+        .in('external_message_id', batchExternalIds);
+      
+      const existingBatchIds = existingBatchMessages?.map(m => m.external_message_id) || [];
+      const newMessagesToInsert = messageInserts.filter(m => 
+        !existingBatchIds.includes(m.external_message_id)
+      );
 
-        if (upsertError) {
-          throw upsertError;
-        }
-        
-        upsertSuccess = true;
-      } catch (error) { 
-        // Handle missing constraint or other upsert failures
-        
-        // Pre-filter messages by checking which ones already exist
-        const batchExternalIds = messageInserts.map(m => m.external_message_id);
-        const { data: existingMessages } = await this.supabase
-          .from('conversation_messages')
-          .select('external_message_id')
-          .in('external_message_id', batchExternalIds);
-        
-        const existingIds = existingMessages?.map(m => m.external_message_id) || [];
-        const newMessagesToInsert = messageInserts.filter(m => 
-          !existingIds.includes(m.external_message_id)
-        );
+      // Insert only truly new messages using regular insert (no upsert)
+      if (newMessagesToInsert.length > 0) {
+        try {
+          const { error: insertError } = await this.supabase
+            .from('conversation_messages')
+            .insert(newMessagesToInsert);
 
-        // Insert truly new messages in smaller batches to handle duplicates better
-        if (newMessagesToInsert.length > 0) {
-          const chunkSize = 10; // Smaller chunks to reduce duplicate collision risk
-          
-          for (let i = 0; i < newMessagesToInsert.length; i += chunkSize) {
-            const chunk = newMessagesToInsert.slice(i, i + chunkSize);
-            
-            try {
-              const { error: insertError } = await this.supabase
-                .from('conversation_messages')
-                .insert(chunk);
-
-              if (insertError) {
-                // Handle individual message conflicts
-                if (insertError.message.includes('duplicate') || insertError.message.includes('unique')) {
-                  
-                  // Insert each message individually to skip duplicates
-                  for (const message of chunk) {
-                    try {
-                      await this.supabase
-                        .from('conversation_messages')
-                        .insert(message);
-                    } catch (individualError: any) { 
-                      if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
-                        console.error(`❌ Failed to insert individual message ${message.external_message_id}:`, individualError?.message || individualError);
-                      }
-                      // Skip duplicates silently
-                    }
+          if (insertError) {
+            // Handle any remaining conflicts with individual inserts
+            if (insertError.message.includes('duplicate') || insertError.message.includes('unique')) {
+              // Insert each message individually to skip duplicates
+              for (const message of newMessagesToInsert) {
+                try {
+                  await this.supabase
+                    .from('conversation_messages')
+                    .insert(message);
+                } catch (individualError: any) { 
+                  if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
+                    console.error(`❌ Failed to insert individual message ${message.external_message_id}:`, individualError?.message || individualError);
                   }
-                } else {
-                  throw insertError;
+                  // Skip duplicates silently
                 }
               }
-            } catch (error: any) { 
-              console.error(`❌ Failed to insert chunk for ${remoteJid}:`, error?.message || error);
-              // Continue with next chunk
+            } else {
+              throw insertError;
             }
           }
+        } catch (error: any) { 
+          console.error(`❌ Failed to insert batch for ${remoteJid}:`, error?.message || error);
+          // Continue with processing
         }
       }
 
