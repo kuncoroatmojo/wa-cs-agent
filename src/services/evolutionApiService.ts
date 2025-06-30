@@ -985,30 +985,67 @@ export class EvolutionApiService {
         const latestMessagePreview = this.extractMessageContent(latestMessage).substring(0, 100);
         const latestMessageFrom = latestMessage.key?.fromMe ? 'agent' : 'contact';
 
-        // Use upsert to handle potential duplicates
-        const { data: newConv, error: convError } = await supabase
+        // Check if conversation exists first, then insert or update
+        const { data: existingConvCheck } = await supabase
           .from('conversations')
-          .upsert({
-            user_id: user.user.id,
-            external_conversation_id: remoteJid,
-            instance_key: instanceName,
-            integration_type: 'whatsapp', // Required field for WhatsApp conversations
-            contact_id: contactId, // Required field - phone number or group ID
-            contact_name: contactName,
-            last_message_at: new Date(Math.max(...messages.map(m => (m.messageTimestamp || 0) * 1000))).toISOString(),
-            last_message_preview: latestMessagePreview,
-            last_message_from: latestMessageFrom
-          }, {
-            onConflict: 'external_conversation_id'
-          })
           .select('id')
+          .eq('user_id', user.user.id)
+          .eq('external_conversation_id', remoteJid)
+          .eq('instance_key', instanceName)
           .single();
 
-        if (convError) {
-          console.error('❌ Error upserting conversation:', convError);
+        let convError = null;
+        if (existingConvCheck) {
+          // Update existing conversation
+          const { data: updatedConv, error: updateError } = await supabase
+            .from('conversations')
+            .update({
+              contact_name: contactName,
+              last_message_at: new Date(Math.max(...messages.map(m => (m.messageTimestamp || 0) * 1000))).toISOString(),
+              last_message_preview: latestMessagePreview,
+              last_message_from: latestMessageFrom,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingConvCheck.id)
+            .select('id')
+            .single();
+          
+          conversation = updatedConv;
+          convError = updateError;
+        } else {
+          // Insert new conversation
+          const { data: newConv, error: insertError } = await supabase
+            .from('conversations')
+            .insert({
+              user_id: user.user.id,
+              external_conversation_id: remoteJid,
+              instance_key: instanceName,
+              integration_type: 'whatsapp', // Required field for WhatsApp conversations
+              contact_id: contactId, // Required field - phone number or group ID
+              contact_name: contactName,
+              last_message_at: new Date(Math.max(...messages.map(m => (m.messageTimestamp || 0) * 1000))).toISOString(),
+              last_message_preview: latestMessagePreview,
+              last_message_from: latestMessageFrom,
+              status: 'active',
+              priority: 'medium',
+              tags: [],
+              message_count: 0,
+              conversation_topics: [],
+              last_synced_at: new Date().toISOString(),
+              sync_status: 'synced',
+              contact_metadata: {}
+            })
+            .select('id')
+            .single();
+          
+          conversation = newConv;
+          convError = insertError;
+        }
+
+        if (convError || !conversation) {
+          console.error('❌ Error creating/updating conversation:', convError);
           return;
         }
-        conversation = newConv;
         console.log(`✅ Created/updated conversation: ${remoteJid} -> ${contactName}`);
       }
 
