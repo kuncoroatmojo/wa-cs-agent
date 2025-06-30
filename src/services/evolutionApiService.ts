@@ -74,6 +74,7 @@ export class EvolutionApiService {
   private apiKey: string;
   private config: EvolutionApiConfig | null = null;
   private messageCache: Map<string, EvolutionMessage[]> = new Map(); // Cache messages by instanceKey
+  private _loggedUnknownTypes: Set<string> = new Set(); // Track logged unknown message types
 
   constructor(baseUrl?: string, apiKey?: string) {
     // Allow injection of baseUrl and apiKey for scripts
@@ -383,7 +384,7 @@ export class EvolutionApiService {
       
       if (!response.ok) {
           throw new Error(`Failed to fetch messages: ${response.status}`);
-        }
+      }
 
         const result = await response.json();
         let pageMessages: any[] = [];
@@ -431,7 +432,7 @@ export class EvolutionApiService {
       const sortedMessages = allMessages.sort((a: any, b: any) => 
         (b.messageTimestamp || 0) - (a.messageTimestamp || 0)
       );
-      
+
       return sortedMessages;
     } catch (error) { 
       console.error('Failed to fetch all recent messages:', error);
@@ -508,14 +509,14 @@ export class EvolutionApiService {
     } catch (error) { 
       console.error('❌ Error loading conversation messages:', error);
         return [];
-    }
+      }
   }
 
   async loadAllMessagesForInstance(instanceName: string): Promise<EvolutionMessage[]> {
     try {
       // Use the new efficient method to get all recent messages (increased limit with pagination)
       const messages = await this.fetchAllRecentMessages(instanceName, 500);
-      
+        
       if (!messages || messages.length === 0) {
           return [];
         }
@@ -541,7 +542,7 @@ export class EvolutionApiService {
   }
 
   private determineMessageType(msg: any): string {
-    if (!msg.message) return 'unknown';
+    if (!msg.message) return 'text'; // Default to 'text' instead of 'unknown'
     
     // Check message type based on message content
     if (msg.message.conversation) return 'text';
@@ -555,7 +556,18 @@ export class EvolutionApiService {
     if (msg.message.extendedTextMessage) return 'text';
     if (msg.message.reactionMessage) return 'reaction';
     
-    return 'unknown';
+    if (msg.message.editedMessage) return 'text'; // Support edited messages
+    
+    // For any unrecognized message types, default to 'text' to avoid constraint violations
+    // Log only once per message type to avoid spam
+    const messageKeys = Object.keys(msg.message || {});
+    const messageType = messageKeys[0];
+    if (!this._loggedUnknownTypes) this._loggedUnknownTypes = new Set();
+    if (!this._loggedUnknownTypes.has(messageType)) {
+      console.warn(`⚠️ Unrecognized message type, defaulting to 'text': ${messageType}`);
+      this._loggedUnknownTypes.add(messageType);
+    }
+    return 'text';
   }
 
   // Clear message cache for an instance (useful for refreshing)
@@ -615,7 +627,7 @@ export class EvolutionApiService {
         console.log(`ℹ️ No messages found for ${remoteJid}`);
         return;
       }
-
+      
       // Get or create the conversation in our database
       let conversation;
       const { data: existingConv } = await supabase
@@ -684,80 +696,127 @@ export class EvolutionApiService {
         conversation = newConv;
       }
 
-      // Convert Evolution messages to our database format and insert them
-      for (const msg of messages) {
-        if (!msg.key?.id) continue;
-
-        // Extract message content
-        let content = '[Media]';
-        let messageType = this.determineMessageType(msg);
-        
-        if (msg.message?.conversation) {
-          content = msg.message.conversation;
-        } else if (msg.message?.extendedTextMessage?.text) {
-          content = msg.message.extendedTextMessage.text;
-        } else if (msg.message?.imageMessage?.caption) {
-          content = msg.message.imageMessage.caption;
-          messageType = 'image';
-        } else if (msg.message?.videoMessage?.caption) {
-          content = msg.message.videoMessage.caption;
-          messageType = 'video';
-        }
-
-        // Check if message already exists
-        const { data: existingMessage } = await supabase
-          .from('conversation_messages')
-          .select('id')
-          .eq('external_message_id', msg.key.id)
-          .single();
-
-        if (!existingMessage) {
-          const { error: msgError } = await supabase
-            .from('conversation_messages')
-            .insert({
+      // Insert messages into database
+      const messagesToInsert = messages.map(msg => ({
         conversation_id: conversation.id,
-              content,
-              message_type: messageType,
-        direction: msg.key.fromMe ? 'outbound' : 'inbound',
-              sender_type: msg.key.fromMe ? 'bot' : 'contact',
-              sender_name: msg.pushName,
-              sender_id: msg.key.fromMe ? instanceName : msg.key.remoteJid,
-              status: 'delivered',
-        external_message_id: msg.key.id,
-        external_timestamp: new Date(msg.messageTimestamp * 1000).toISOString(),
-              external_metadata: msg,
-              ai_processed: false,
-              media_metadata: {},
-              created_at: new Date(msg.messageTimestamp * 1000).toISOString(),
-              updated_at: new Date().toISOString()
-            });
+        external_message_id: msg.key?.id,
+        content: this.extractMessageContent(msg),
+        message_type: this.determineMessageType(msg),
+        direction: msg.key?.fromMe ? 'outbound' : 'inbound',
+        sender_type: msg.key?.fromMe ? 'agent' : 'contact',
+        sender_name: msg.key?.fromMe ? 'Agent' : (msg.pushName || null),
+        sender_id: msg.key?.fromMe ? 'agent' : remoteJid,
+        external_timestamp: new Date((msg.messageTimestamp || 0) * 1000).toISOString(),
+        external_metadata: {
+          pushName: msg.pushName,
+          messageType: msg.messageType,
+          source: msg.source,
+          participant: msg.participant
+        }
+      }));
 
-          if (msgError) {
-            console.error('❌ Error inserting message:', msgError);
+      // Pre-filter to check which messages already exist to avoid 400 errors from upsert conflicts
+      const externalMessageIds = messagesToInsert
+        .map(m => m.external_message_id)
+        .filter(Boolean);
+
+      let existingMessageIds: string[] = [];
+      if (externalMessageIds.length > 0) {
+        const { data: existingMessages } = await supabase
+          .from('conversation_messages')
+          .select('external_message_id')
+          .in('external_message_id', externalMessageIds);
+        
+        existingMessageIds = existingMessages?.map(m => m.external_message_id) || [];
+      }
+
+      // Filter out messages that already exist
+      const newMessagesToInsert = messagesToInsert.filter(m => 
+        m.external_message_id && !existingMessageIds.includes(m.external_message_id)
+      );
+
+      console.log(`📥 Processing ${newMessagesToInsert.length} new messages (${existingMessageIds.length} already exist)`);
+
+      // Batch insert new messages only (no upsert to avoid RLS conflicts)
+      if (newMessagesToInsert.length > 0) {
+        const batchSize = 50;
+        let successfulInserts = 0;
+
+        for (let i = 0; i < newMessagesToInsert.length; i += batchSize) {
+          const batch = newMessagesToInsert.slice(i, i + batchSize);
+          
+          try {
+            const { error: insertError } = await supabase
+              .from('conversation_messages')
+              .insert(batch);
+
+            if (insertError) {
+              console.warn(`⚠️ Failed to insert batch of ${batch.length} messages:`, insertError.message);
+              
+              // Try inserting individual messages to handle any remaining conflicts
+              for (const messageData of batch) {
+                try {
+                  await supabase
+                    .from('conversation_messages')
+                    .insert(messageData);
+                  successfulInserts++;
+                } catch (individualError: any) {
+                  if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
+                    console.warn(`⚠️ Failed to insert individual message ${messageData.external_message_id}:`, individualError?.message);
+                  }
+                  // Skip duplicates silently
+                }
+              }
+            } else {
+              successfulInserts += batch.length;
+            }
+          } catch (batchError: any) {
+            console.warn(`⚠️ Batch insert failed, trying individual inserts:`, batchError?.message);
+            
+            // Fallback to individual inserts
+            for (const messageData of batch) {
+              try {
+                await supabase
+                  .from('conversation_messages')
+                  .insert(messageData);
+                successfulInserts++;
+              } catch (individualError: any) {
+                if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
+                  console.warn(`⚠️ Failed to insert individual message ${messageData.external_message_id}:`, individualError?.message);
+                }
+              }
+            }
           }
         }
+
+        console.log(`✅ Successfully inserted ${successfulInserts} messages for conversation ${remoteJid}`);
       }
 
-      // Update conversation with latest message info
-      const latestMessage = messages[0];
+      // After inserting all messages, update the conversation with the truly latest message
+      // Get the actual latest message from the database (not just from the current batch)
+      const { data: latestMessage } = await supabase
+        .from('conversation_messages')
+        .select('content, sender_type, external_timestamp')
+        .eq('conversation_id', conversation.id)
+        .order('external_timestamp', { ascending: false })
+        .limit(1)
+        .single();
+
       if (latestMessage) {
-        const { error: updateError } = await supabase
+        await supabase
           .from('conversations')
           .update({
-            last_message_at: new Date(latestMessage.messageTimestamp * 1000).toISOString(),
-            last_message_preview: this.extractMessageContent(latestMessage).substring(0, 100),
-            last_message_from: latestMessage.key.fromMe ? 'agent' : 'contact',
-            last_synced_at: new Date().toISOString(),
-            sync_status: 'synced'
+            last_message_at: latestMessage.external_timestamp,
+            last_message_preview: latestMessage.content.substring(0, 100),
+            last_message_from: latestMessage.sender_type === 'agent' ? 'agent' : 'contact'
           })
           .eq('id', conversation.id);
-
-        if (updateError) {
-          console.error('❌ Error updating conversation:', updateError);
-        }
+        
+        console.log(`✅ Synced ${messages.length} messages for conversation ${remoteJid} - Updated preview: "${latestMessage.content.substring(0, 50)}..."`);
+      } else {
+        console.log(`✅ Synced ${messages.length} messages for conversation ${remoteJid}`);
       }
 
-      console.log(`✅ Successfully synced ${messages.length} messages for ${remoteJid}`);
     } catch (error) { 
       console.error(`❌ Error syncing messages for ${remoteJid}:`, error);
     }
@@ -972,42 +1031,120 @@ export class EvolutionApiService {
         }
       }));
 
-      // Batch insert messages (handle duplicates)
-      for (const messageData of messagesToInsert) {
-        try {
-          await supabase
-        .from('conversation_messages')
-            .upsert(messageData, {
-              onConflict: 'external_message_id'
-            });
-        } catch (error) {
-          console.warn(`⚠️ Failed to insert message ${messageData.external_message_id}:`, error);
-        }
+      // Pre-filter to check which messages already exist to avoid 400 errors from upsert conflicts
+      const externalMessageIds = messagesToInsert
+        .map(m => m.external_message_id)
+        .filter(Boolean);
+
+      let existingMessageIds: string[] = [];
+      if (externalMessageIds.length > 0) {
+        const { data: existingMessages } = await supabase
+          .from('conversation_messages')
+          .select('external_message_id')
+          .in('external_message_id', externalMessageIds);
+        
+        existingMessageIds = existingMessages?.map(m => m.external_message_id) || [];
       }
 
-      // After inserting all messages, update the conversation with the truly latest message
-      // Get the actual latest message from the database (not just from the current batch)
-      const { data: latestMessage } = await supabase
-        .from('conversation_messages')
-        .select('content, sender_type, external_timestamp')
-        .eq('conversation_id', conversation.id)
-        .order('external_timestamp', { ascending: false })
-        .limit(1)
-        .single();
+      // Filter out messages that already exist
+      const newMessagesToInsert = messagesToInsert.filter(m => 
+        m.external_message_id && !existingMessageIds.includes(m.external_message_id)
+      );
 
-      if (latestMessage) {
-        await supabase
-          .from('conversations')
-          .update({
-            last_message_at: latestMessage.external_timestamp,
-            last_message_preview: latestMessage.content.substring(0, 100),
-            last_message_from: latestMessage.sender_type === 'agent' ? 'agent' : 'contact'
-          })
-          .eq('id', conversation.id);
+      console.log(`📥 Processing ${newMessagesToInsert.length} new messages (${existingMessageIds.length} already exist)`);
+
+      // Batch insert new messages only (no upsert to avoid RLS conflicts)
+      if (newMessagesToInsert.length > 0) {
+        const batchSize = 50;
+        let successfulInserts = 0;
+
+        for (let i = 0; i < newMessagesToInsert.length; i += batchSize) {
+          const batch = newMessagesToInsert.slice(i, i + batchSize);
+          
+          try {
+            const { error: insertError } = await supabase
+              .from('conversation_messages')
+              .insert(batch);
+
+            if (insertError) {
+              console.warn(`⚠️ Failed to insert batch of ${batch.length} messages:`, insertError.message);
+              
+              // Try inserting individual messages to handle any remaining conflicts
+              for (const messageData of batch) {
+                try {
+                  await supabase
+                    .from('conversation_messages')
+                    .insert(messageData);
+                  successfulInserts++;
+                } catch (individualError: any) {
+                  if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
+                    console.warn(`⚠️ Failed to insert individual message ${messageData.external_message_id}:`, individualError?.message);
+                  }
+                  // Skip duplicates silently
+                }
+              }
+            } else {
+              successfulInserts += batch.length;
+            }
+          } catch (batchError: any) {
+            console.warn(`⚠️ Batch insert failed, trying individual inserts:`, batchError?.message);
+            
+            // Fallback to individual inserts
+            for (const messageData of batch) {
+              try {
+                await supabase
+                  .from('conversation_messages')
+                  .insert(messageData);
+                successfulInserts++;
+              } catch (individualError: any) {
+                if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
+                  console.warn(`⚠️ Failed to insert individual message ${messageData.external_message_id}:`, individualError?.message);
+                }
+              }
+            }
+          }
+        }
+
+        console.log(`✅ Successfully inserted ${successfulInserts} messages for conversation ${remoteJid}`);
         
-        console.log(`✅ Synced ${messagesToInsert.length} messages for conversation ${remoteJid} - Updated preview: "${latestMessage.content.substring(0, 50)}..."`);
-      } else {
-        console.log(`✅ Synced ${messagesToInsert.length} messages for conversation ${remoteJid}`);
+        // Update conversation with latest message preview and timestamp
+        if (successfulInserts > 0) {
+          try {
+            // Find the actual latest message from the database (not just newly inserted ones)
+            const { data: latestMessageData, error: queryError } = await supabase
+              .from('conversation_messages')
+              .select('content, external_timestamp')
+              .eq('conversation_id', conversation.id)
+              .order('external_timestamp', { ascending: false })
+              .limit(1)
+              .single();
+
+            if (queryError) {
+              console.warn(`⚠️ Failed to query latest message for ${remoteJid}:`, queryError.message);
+              return;
+            }
+
+            if (latestMessageData) {
+              // Update the conversation with the actual latest message preview
+              const { error: updateError } = await supabase
+                .from('conversations')
+                .update({
+                  last_message_at: latestMessageData.external_timestamp,
+                  last_message_preview: latestMessageData.content.substring(0, 100), // Limit preview length
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', conversation.id);
+
+              if (updateError) {
+                console.warn(`⚠️ Failed to update conversation preview for ${remoteJid}:`, updateError.message);
+              } else {
+                console.log(`✅ Updated conversation preview for ${remoteJid}: "${latestMessageData.content.substring(0, 50)}..."`);
+              }
+            }
+          } catch (updateError) {
+            console.warn(`⚠️ Error updating conversation preview for ${remoteJid}:`, updateError);
+          }
+        }
       }
 
     } catch (error) { 

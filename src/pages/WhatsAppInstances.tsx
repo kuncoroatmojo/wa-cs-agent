@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWhatsAppStore } from '../store/whatsappStore';
 import { useAuthStore } from '../store/authStore';
 import { useEvolutionApiStore } from '../store/evolutionApiStore';
@@ -12,6 +13,7 @@ import type { WhatsAppInstance } from '../types';
 import { WHATSAPP_CONFIG } from '../constants';
 
 const WhatsAppInstances: React.FC = () => {
+  const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [_selectedInstance, _setSelectedInstance] = useState<string | null>(null);
   const [syncingInstances, setSyncingInstances] = useState<Set<string>>(new Set());
@@ -355,6 +357,15 @@ const WhatsAppInstances: React.FC = () => {
           messages: result.messagesSynced,
           errors: result.errors.length
         });
+
+        // Navigate to conversations page to show updated previews
+        if (result.conversationsSynced > 0 || result.messagesSynced > 0) {
+          setTimeout(() => {
+            // Add a timestamp parameter to force refresh
+            navigate(`/conversations?refresh=${Date.now()}`);
+            toast.success('📱 View your updated conversations!', { duration: 4000 });
+          }, 2000); // Wait 2 seconds after sync completion
+        }
       } else {
         // For non-Evolution API instances, just show conversations sync success
         toast.success(`Conversations synced for ${instance.name}`, {
@@ -452,12 +463,12 @@ const WhatsAppInstances: React.FC = () => {
         <div className="flex gap-2">
           {/* Only show create button if no instances exist */}
           {allInstances.length === 0 && (
-            <button
+          <button
               onClick={() => setShowCreateModal(true)}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
+          >
               Create Instance
-            </button>
+          </button>
           )}
           <button
             onClick={handleCleanup}

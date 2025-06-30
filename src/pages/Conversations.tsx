@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
 import { conversationService, type UnifiedConversation } from '../services/conversationService'
@@ -343,6 +344,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, disabled }) 
 
 const Conversations: React.FC = () => {
   const { profile } = useAuthStore()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [conversations, setConversations] = useState<UnifiedConversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<UnifiedConversation | null>(null)
   const [messages, setMessages] = useState<UnifiedMessage[]>([])
@@ -358,6 +360,38 @@ const Conversations: React.FC = () => {
       loadConversations()
     }
   }, [profile])
+
+  // Watch for refresh parameter in URL
+  useEffect(() => {
+    const refreshParam = searchParams.get('refresh')
+    if (refreshParam && profile) {
+      console.log('🔄 Forced refresh triggered from URL parameter')
+      // Immediate refresh
+      loadConversations()
+      
+      // Also schedule additional refreshes to catch any delayed updates
+      const refreshTimeout1 = setTimeout(() => {
+        console.log('🔄 Secondary refresh after 1 second')
+        loadConversations()
+      }, 1000)
+      
+      const refreshTimeout2 = setTimeout(() => {
+        console.log('🔄 Final refresh after 3 seconds')
+        loadConversations()
+      }, 3000)
+      
+      // Clean up the URL parameter after a delay
+      const cleanupTimeout = setTimeout(() => {
+        setSearchParams({})
+      }, 500)
+      
+      return () => {
+        clearTimeout(refreshTimeout1)
+        clearTimeout(refreshTimeout2)
+        clearTimeout(cleanupTimeout)
+      }
+    }
+  }, [searchParams, profile])
 
   // Set up real-time subscriptions
   useEffect(() => {
@@ -419,7 +453,7 @@ const Conversations: React.FC = () => {
       
       const filters = {
         status: filterStatus === 'all' ? undefined : filterStatus,
-        limit: 100
+        limit: 500  // Increased from 100 to ensure all conversations are fetched
       }
       
       const unifiedConversations = await conversationService.getAllConversations(profile!.id, filters)
