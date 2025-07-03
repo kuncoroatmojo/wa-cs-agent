@@ -566,6 +566,7 @@ export class EvolutionMessageSyncService {
       
       // Progress update for large conversations
       if (newMessages.length > 100 && processedCount % 100 === 0) {
+        console.log(`Progress: ${processedCount}/${newMessages.length} messages processed`);
       }
     }
 

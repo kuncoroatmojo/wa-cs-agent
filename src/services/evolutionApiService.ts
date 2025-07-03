@@ -728,7 +728,7 @@ export class EvolutionApiService {
       // Batch insert new messages only (no upsert to avoid RLS conflicts)
       if (newMessagesToInsert.length > 0) {
         const batchSize = 50;
-        let successfulInserts = 0;
+        let _successfulInserts = 0;
 
         for (let i = 0; i < newMessagesToInsert.length; i += batchSize) {
           const batch = newMessagesToInsert.slice(i, i + batchSize);
@@ -746,17 +746,18 @@ export class EvolutionApiService {
                   await supabase
                     .from('conversation_messages')
                     .insert(messageData);
-                  successfulInserts++;
+                  _successfulInserts++;
                 } catch (individualError: any) {
                   if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
+                    console.error('Failed to insert individual message:', individualError);
                   }
                   // Skip duplicates silently
                 }
               }
             } else {
-              successfulInserts += batch.length;
+              _successfulInserts += batch.length;
             }
-          } catch (batchError: any) {
+          } catch (_batchError: any) {
             
             // Fallback to individual inserts
             for (const messageData of batch) {
@@ -764,9 +765,10 @@ export class EvolutionApiService {
                 await supabase
                   .from('conversation_messages')
                   .insert(messageData);
-                successfulInserts++;
+                _successfulInserts++;
               } catch (individualError: any) {
                 if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
+                  console.error('Failed to insert fallback message:', individualError);
                 }
               }
             }
@@ -797,6 +799,7 @@ export class EvolutionApiService {
         
         console.log(`✅ Synced ${messages.length} messages for conversation ${remoteJid} - Updated preview: "${latestMessage.content.substring(0, 50)}..."`);
       } else {
+        console.log(`⚠️ No latest message found for conversation ${remoteJid}`);
       }
 
     } catch (error) { 
@@ -952,8 +955,8 @@ export class EvolutionApiService {
               contact_name: contactName
             })
             .eq('id', existingConv.id);
-        } else {
         }
+        // Individual conversations don't need name updates in this context
       } else {
         // Find the latest message for preview
         const latestMessage = messages.reduce((latest, current) => 
@@ -1042,7 +1045,7 @@ export class EvolutionApiService {
       // Batch insert new messages only (no upsert to avoid RLS conflicts)
       if (newMessagesToInsert.length > 0) {
         const batchSize = 50;
-        let successfulInserts = 0;
+        let _successfulInserts = 0;
 
         for (let i = 0; i < newMessagesToInsert.length; i += batchSize) {
           const batch = newMessagesToInsert.slice(i, i + batchSize);
@@ -1060,17 +1063,18 @@ export class EvolutionApiService {
                   await supabase
                     .from('conversation_messages')
                     .insert(messageData);
-                  successfulInserts++;
+                  _successfulInserts++;
                 } catch (individualError: any) {
                   if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
+                    console.error('Failed to insert individual message:', individualError);
                   }
                   // Skip duplicates silently
                 }
               }
             } else {
-              successfulInserts += batch.length;
+              _successfulInserts += batch.length;
             }
-          } catch (batchError: any) {
+          } catch (_batchError: any) {
             
             // Fallback to individual inserts
             for (const messageData of batch) {
@@ -1078,9 +1082,10 @@ export class EvolutionApiService {
                 await supabase
                   .from('conversation_messages')
                   .insert(messageData);
-                successfulInserts++;
+                _successfulInserts++;
               } catch (individualError: any) {
                 if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
+                  console.error('Failed to insert fallback message:', individualError);
                 }
               }
             }
@@ -1089,7 +1094,7 @@ export class EvolutionApiService {
 
         
         // Update conversation with latest message preview and timestamp
-        if (successfulInserts > 0) {
+        if (_successfulInserts > 0) {
           try {
             // Find the actual latest message from the database (not just newly inserted ones)
             const { data: latestMessageData, error: queryError } = await supabase
@@ -1101,6 +1106,7 @@ export class EvolutionApiService {
               .single();
 
             if (queryError) {
+              console.error('Failed to query latest message:', queryError);
               return;
             }
 
@@ -1116,11 +1122,13 @@ export class EvolutionApiService {
                 .eq('id', conversation.id);
 
               if (updateError) {
+                console.error('Failed to update conversation preview:', updateError);
               } else {
                 console.log(`✅ Updated conversation preview for ${remoteJid}: "${latestMessageData.content.substring(0, 50)}..."`);
               }
             }
-          } catch (updateError) {
+          } catch (_updateError: any) {
+            console.error('Error updating conversation:', _updateError);
           }
         }
       }
