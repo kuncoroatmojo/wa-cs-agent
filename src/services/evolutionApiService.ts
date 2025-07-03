@@ -1,8 +1,6 @@
-import { supabase, edgeFunctions } from '../lib/supabase';
-import type { Conversation, WhatsAppInstance } from '../types';
+import { supabase } from '../lib/supabase';
+import type { Conversation } from '../types';
 import { ConversationService } from './conversationService';
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../types/database';
 
 export interface EvolutionApiConfig {
   baseUrl: string;
@@ -179,9 +177,6 @@ export class EvolutionApiService {
         "Content-Type": "application/json",
         "apikey": evolutionApiKey
       };
-
-      if (body) {
-      }
 
       const response = await fetch(fullUrl, {
       method,
@@ -398,6 +393,7 @@ export class EvolutionApiService {
           
           // If this is the first page, log total available
           if (pageOffset === 0) {
+            console.log(`📊 Total messages available: ${result.total || 'unknown'}`);
           }
         } else if (Array.isArray(result)) {
           pageMessages = result;
@@ -494,8 +490,8 @@ export class EvolutionApiService {
 
         if (retryError) {
           console.error('❌ Error in retry fetch:', retryError);
-      return [];
-    }
+          return [];
+        }
 
         return retryMessages || [];
       }

@@ -191,7 +191,7 @@ export class EvolutionMessageSyncService {
       messagesByConversation[remoteJid].push(msg);
     });
 
-    const conversationCount = Object.keys(messagesByConversation).length;
+    const _conversationCount = Object.keys(messagesByConversation).length;
     
     return messagesByConversation;
   }
@@ -340,10 +340,12 @@ export class EvolutionMessageSyncService {
       progress.endTime = new Date();
 
       const duration = Math.round((progress.endTime.getTime() - progress.startTime.getTime()) / 1000);
-      const avgMsgPerSec = Math.round(progress.processedMessages / duration);
+      const _avgMsgPerSec = Math.round(progress.processedMessages / duration);
 
+      console.log(`✅ Sync completed in ${duration}s - ${progress.processedMessages} messages (${_avgMsgPerSec} msg/s)`);
 
       if (progress.errors.length > 0) {
+        console.warn(`⚠️ Sync completed with ${progress.errors.length} errors`);
       }
 
     } catch (error) { 

@@ -142,6 +142,7 @@ export const useWhatsAppStore = create<WhatsAppStore>((set, get) => ({
             console.error('Failed to start WhatsApp connection:', connectResponse.error);
             // Don't fail the entire operation, just log the error
           } else {
+            console.log('WhatsApp connection started successfully');
           }
         } catch (connectError) {
           console.error('Failed to call whatsapp-connect function:', connectError);
