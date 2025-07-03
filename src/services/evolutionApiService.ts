@@ -208,17 +208,32 @@ export class EvolutionApiService {
       }
       
       const result = await response.json();
+      console.log('🔍 Raw Evolution API response:', JSON.stringify(result, null, 2));
+      
       const allInstances = result.instances || result || [];
+      console.log(`📱 Processed ${allInstances.length} instances from API`);
+      
+      // Validate instances and log any issues
+      const validInstances = allInstances.filter((instance: any, index: number) => {
+        const instanceName = instance.instanceName || instance.name;
+        if (!instanceName) {
+          console.warn(`⚠️ Instance ${index} missing name:`, JSON.stringify(instance, null, 2));
+          return false;
+        }
+        return true;
+      });
+      
+      console.log(`✅ ${validInstances.length} valid instances after filtering`);
       
       // Filter instances based on target instance if provided
       if (targetInstance) {
-        return allInstances.filter((instance: EvolutionInstance) => 
+        return validInstances.filter((instance: EvolutionInstance) => 
           instance.instanceName === targetInstance
         );
       }
       
-      // Return all instances if no target specified
-      return allInstances;
+      // Return all valid instances if no target specified
+      return validInstances;
     } catch (error) { 
       console.error('Error fetching instances:', error);
       return [];
@@ -1371,6 +1386,14 @@ export class EvolutionApiService {
 
       // Fetch instances from Evolution API
       const evolutionInstances = await this.fetchInstances();
+      
+      console.log('🔄 Syncing instances with database...');
+      console.log(`📊 Found ${evolutionInstances.length} instances from Evolution API`);
+      
+      // Debug log the instance structure
+      if (evolutionInstances.length > 0) {
+        console.log('📋 Sample instance structure:', JSON.stringify(evolutionInstances[0], null, 2));
+      }
 
       // Get existing instances from database
       const { data: existingInstances, error: fetchError } = await supabase
@@ -1387,16 +1410,24 @@ export class EvolutionApiService {
 
       // Insert new instances
       for (const evolutionInstance of evolutionInstances) {
-        if (!existingInstanceKeys.has(evolutionInstance.instanceName)) {
+        // Validate that the instance has a valid name/instanceName
+        // Handle different possible property names from Evolution API
+        const instanceName = evolutionInstance.instanceName || (evolutionInstance as any).name;
+        if (!instanceName) {
+          console.warn('⚠️ Skipping instance without valid name:', evolutionInstance);
+          continue;
+        }
+
+        if (!existingInstanceKeys.has(instanceName)) {
           const { error: insertError } = await supabase
             .from('whatsapp_instances')
             .insert({
               user_id: user.id,
-              name: evolutionInstance.instanceName, // Add the required name field
-              instance_key: evolutionInstance.instanceName,
+              name: instanceName, // Use validated instance name
+              instance_key: instanceName,
               connection_type: 'evolution_api', // Set the connection type
               status: this.mapEvolutionStatus(evolutionInstance.status),
-              phone_number: evolutionInstance.number,
+              phone_number: evolutionInstance.number || evolutionInstance.owner,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             });
@@ -1406,29 +1437,37 @@ export class EvolutionApiService {
           } else {
             
             // Verify and fix webhook for new instance
-            await this.verifyAndFixWebhook(evolutionInstance.instanceName);
+            await this.verifyAndFixWebhook(instanceName);
           }
         }
       }
 
       // Update existing instances
       for (const evolutionInstance of evolutionInstances) {
-        if (existingInstanceKeys.has(evolutionInstance.instanceName)) {
+        // Validate that the instance has a valid name/instanceName
+        // Handle different possible property names from Evolution API
+        const instanceName = evolutionInstance.instanceName || (evolutionInstance as any).name;
+        if (!instanceName) {
+          console.warn('⚠️ Skipping instance without valid name for update:', evolutionInstance);
+          continue;
+        }
+
+        if (existingInstanceKeys.has(instanceName)) {
           const { error: updateError } = await supabase
             .from('whatsapp_instances')
             .update({
               status: this.mapEvolutionStatus(evolutionInstance.status),
-              phone_number: evolutionInstance.number,
+              phone_number: evolutionInstance.number || evolutionInstance.owner,
               updated_at: new Date().toISOString()
             })
-            .eq('instance_key', evolutionInstance.instanceName)
+            .eq('instance_key', instanceName)
             .eq('user_id', user.id);
 
           if (updateError) {
             console.error('Failed to update instance:', updateError);
           } else {
             // Verify and fix webhook for existing instance
-            await this.verifyAndFixWebhook(evolutionInstance.instanceName);
+            await this.verifyAndFixWebhook(instanceName);
           }
         }
       }
