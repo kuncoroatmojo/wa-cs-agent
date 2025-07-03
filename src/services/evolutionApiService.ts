@@ -1388,7 +1388,9 @@ export class EvolutionApiService {
             .from('whatsapp_instances')
             .insert({
               user_id: user.id,
+              name: evolutionInstance.instanceName, // Add the required name field
               instance_key: evolutionInstance.instanceName,
+              connection_type: 'evolution_api', // Set the connection type
               status: this.mapEvolutionStatus(evolutionInstance.status),
               phone_number: evolutionInstance.number,
               created_at: new Date().toISOString(),
