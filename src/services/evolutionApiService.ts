@@ -225,15 +225,25 @@ export class EvolutionApiService {
       
       console.log(`✅ ${validInstances.length} valid instances after filtering`);
       
+      // Map instances to have consistent property names
+      const mappedInstances = validInstances.map((instance: any) => ({
+        instanceName: instance.instanceName || instance.name,
+        status: instance.status || instance.connectionStatus,
+        qrcode: instance.qrcode,
+        number: instance.number,
+        owner: instance.owner || instance.ownerJid,
+        webhook: instance.webhook
+      }));
+      
       // Filter instances based on target instance if provided
       if (targetInstance) {
-        return validInstances.filter((instance: EvolutionInstance) => 
+        return mappedInstances.filter((instance: EvolutionInstance) => 
           instance.instanceName === targetInstance
         );
       }
       
       // Return all valid instances if no target specified
-      return validInstances;
+      return mappedInstances;
     } catch (error) { 
       console.error('Error fetching instances:', error);
       return [];
@@ -1426,8 +1436,8 @@ export class EvolutionApiService {
               name: instanceName, // Use validated instance name
               instance_key: instanceName,
               connection_type: 'evolution_api', // Set the connection type
-              status: this.mapEvolutionStatus(evolutionInstance.status),
-              phone_number: evolutionInstance.number || evolutionInstance.owner,
+              status: this.mapEvolutionStatus((evolutionInstance as any).connectionStatus || evolutionInstance.status),
+              phone_number: evolutionInstance.number || (evolutionInstance as any).owner || (evolutionInstance as any).ownerJid?.replace('@s.whatsapp.net', ''),
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             });
@@ -1456,8 +1466,8 @@ export class EvolutionApiService {
           const { error: updateError } = await supabase
             .from('whatsapp_instances')
             .update({
-              status: this.mapEvolutionStatus(evolutionInstance.status),
-              phone_number: evolutionInstance.number || evolutionInstance.owner,
+              status: this.mapEvolutionStatus((evolutionInstance as any).connectionStatus || evolutionInstance.status),
+              phone_number: evolutionInstance.number || (evolutionInstance as any).owner || (evolutionInstance as any).ownerJid?.replace('@s.whatsapp.net', ''),
               updated_at: new Date().toISOString()
             })
             .eq('instance_key', instanceName)
@@ -1507,7 +1517,9 @@ export class EvolutionApiService {
         this.getInstanceState(instanceName)
       ]);
 
-      const instance = instances.find(i => i.instanceName === instanceName) || null;
+      const instance = instances.find(i => 
+        i.instanceName === instanceName || (i as any).name === instanceName
+      ) || null;
 
       return {
         instance,
@@ -1533,18 +1545,20 @@ export class EvolutionApiService {
       for (let i = 0; i < retries; i++) {
         try {
           const setWebhookResponse = await this.makeRequest(`/webhook/set/${instanceName}`, 'POST', {
-            enabled: true,
-            url: webhookUrl, // API expects 'url' not 'webhook'
-            webhook_by_events: false, // Don't append event names to URL
-            events: [
-              'MESSAGES_UPSERT',
-              'MESSAGES_UPDATE',
-              'CONNECTION_UPDATE',
-              'CONTACTS_UPDATE',
-              'CHATS_UPDATE',
-              'CHATS_UPSERT',
-              'PRESENCE_UPDATE'
-            ]
+            webhook: {
+              enabled: true,
+              url: webhookUrl,
+              webhook_by_events: false, // Don't append event names to URL
+              events: [
+                'MESSAGES_UPSERT',
+                'MESSAGES_UPDATE',
+                'CONNECTION_UPDATE',
+                'CONTACTS_UPDATE',
+                'CHATS_UPDATE',
+                'CHATS_UPSERT',
+                'PRESENCE_UPDATE'
+              ]
+            }
           });
           
           if (!setWebhookResponse.ok) {
@@ -1635,7 +1649,10 @@ export class EvolutionApiService {
       const instances = await this.fetchInstances();
       
       for (const instance of instances) {
-        await this.verifyAndFixWebhook(instance.instanceName);
+        const instanceName = instance.instanceName || (instance as any).name;
+        if (instanceName) {
+          await this.verifyAndFixWebhook(instanceName);
+        }
       }
       
     } catch (error) { 
