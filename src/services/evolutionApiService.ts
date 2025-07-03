@@ -104,7 +104,6 @@ export class EvolutionApiService {
       this.baseUrl = baseUrl;
       this.apiKey = apiKey;
       this.config = { baseUrl, apiKey };
-      console.log('✅ Loaded Evolution API config from env');
     } else {
       console.error('❌ Missing required environment variables:');
       if (!baseUrl) console.error('- VITE_EVOLUTION_API_URL');
@@ -167,7 +166,6 @@ export class EvolutionApiService {
     try {
       // Use local Edge Function in development
       const isDev = import.meta.env.DEV || window.location.hostname === 'localhost';
-      console.log(`🔍 Environment detection - DEV: ${import.meta.env.DEV}, hostname: ${window.location.hostname}, isDev: ${isDev}`);
       
       const edgeFunctionUrl = isDev 
         ? 'http://localhost:54321/functions/v1/evolution-proxy'
@@ -183,7 +181,6 @@ export class EvolutionApiService {
       };
 
       if (body) {
-        console.log('📦 Request body:', body);
       }
 
       const response = await fetch(fullUrl, {
@@ -206,7 +203,8 @@ export class EvolutionApiService {
   }
 
   // Fetch all instances from Evolution API
-  async fetchInstances(): Promise<EvolutionInstance[]> {
+  // Fetch all instances, optionally filtered by target instance
+  async fetchInstances(targetInstance?: string): Promise<EvolutionInstance[]> {
     try {
       const response = await this.makeRequest('/instance/fetchInstances', 'GET');
       
@@ -217,11 +215,15 @@ export class EvolutionApiService {
       const result = await response.json();
       const allInstances = result.instances || result || [];
       
-      // Filter instances based on target instance configuration
-      const targetInstance = import.meta.env.VITE_WHATSAPP_TARGET_INSTANCE || 'istn';
-      return allInstances.filter((instance: EvolutionInstance) => 
-        instance.instanceName === targetInstance
-      );
+      // Filter instances based on target instance if provided
+      if (targetInstance) {
+        return allInstances.filter((instance: EvolutionInstance) => 
+          instance.instanceName === targetInstance
+        );
+      }
+      
+      // Return all instances if no target specified
+      return allInstances;
     } catch (error) { 
       console.error('Error fetching instances:', error);
       return [];
@@ -396,19 +398,16 @@ export class EvolutionApiService {
           
           // If this is the first page, log total available
           if (pageOffset === 0) {
-            console.log(`📊 Total messages available: ${result.messages.total}`);
           }
         } else if (Array.isArray(result)) {
           pageMessages = result;
           console.log(`✅ Page ${Math.floor(pageOffset / pageSize) + 1}: Found ${pageMessages.length} messages`);
         } else {
-          console.warn('Unexpected messages response format:', result);
           break;
         }
         
         // If no messages returned, we've reached the end
         if (pageMessages.length === 0) {
-          console.log(`📄 No more messages found at offset ${pageOffset}`);
           break;
         }
         
@@ -426,7 +425,6 @@ export class EvolutionApiService {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
-      console.log(`✅ Fetched ${allMessages.length} total messages for ${instanceName}`);
       
       // Sort by timestamp descending to get latest messages first
       const sortedMessages = allMessages.sort((a: any, b: any) => 
@@ -445,7 +443,6 @@ export class EvolutionApiService {
    */
   async loadConversationMessages(remoteJid: string, instanceName: string): Promise<any[]> {
     try {
-      console.log(`📥 Loading messages for ${remoteJid} from instance ${instanceName}...`);
 
       // First sync messages with our database
       await this.syncMessagesWithDatabase(instanceName, remoteJid);
@@ -484,7 +481,6 @@ export class EvolutionApiService {
       }
 
       if (!messages || messages.length === 0) {
-        console.log('ℹ️ No messages found in database, trying to sync again...');
         // Try syncing one more time
         await this.syncMessagesWithDatabase(instanceName, remoteJid);
         
@@ -504,7 +500,6 @@ export class EvolutionApiService {
         return retryMessages || [];
       }
 
-      console.log(`✅ Loaded ${messages.length} messages for ${remoteJid}`);
       return messages;
     } catch (error) { 
       console.error('❌ Error loading conversation messages:', error);
@@ -564,7 +559,6 @@ export class EvolutionApiService {
     const messageType = messageKeys[0];
     if (!this._loggedUnknownTypes) this._loggedUnknownTypes = new Set();
     if (!this._loggedUnknownTypes.has(messageType)) {
-      console.warn(`⚠️ Unrecognized message type, defaulting to 'text': ${messageType}`);
       this._loggedUnknownTypes.add(messageType);
     }
     return 'text';
@@ -601,13 +595,10 @@ export class EvolutionApiService {
       
       // Handle the correct response structure: { messages: { records: [...] } }
       if (result && result.messages && Array.isArray(result.messages.records)) {
-        console.log(`✅ Fetched ${result.messages.records.length} messages for ${remoteJid}`);
         return result.messages.records;
       } else if (Array.isArray(result)) {
-        console.log(`✅ Fetched ${result.length} messages for ${remoteJid}`);
         return result;
       } else {
-        console.warn('Unexpected messages response format:', result);
         return [];
       }
     } catch (error) { 
@@ -618,13 +609,11 @@ export class EvolutionApiService {
 
   async syncMessagesWithDatabase(instanceName: string, remoteJid: string): Promise<void> {
     try {
-      console.log(`🔄 Syncing messages for ${remoteJid} from instance ${instanceName}...`);
       
       // Get messages from Evolution API using the correct endpoint
       const messages = await this.fetchMessages(instanceName, remoteJid, 500); // Increased limit
       
       if (!messages || messages.length === 0) {
-        console.log(`ℹ️ No messages found for ${remoteJid}`);
         return;
       }
       
@@ -669,7 +658,7 @@ export class EvolutionApiService {
 
         const { data: newConv, error: convError } = await supabase
           .from('conversations')
-          .insert({
+          .upsert({
             user_id: user.user.id,
             integration_type: 'whatsapp',
             instance_key: instanceName,
@@ -684,7 +673,10 @@ export class EvolutionApiService {
             last_message_at: new Date().toISOString(),
             conversation_topics: [],
             last_synced_at: new Date().toISOString(),
-            sync_status: 'synced'
+            sync_status: 'synced',
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,external_conversation_id,instance_key'
           })
           .select('id')
           .single();
@@ -751,7 +743,6 @@ export class EvolutionApiService {
               .insert(batch);
 
             if (insertError) {
-              console.warn(`⚠️ Failed to insert batch of ${batch.length} messages:`, insertError.message);
               
               // Try inserting individual messages to handle any remaining conflicts
               for (const messageData of batch) {
@@ -762,7 +753,6 @@ export class EvolutionApiService {
                   successfulInserts++;
                 } catch (individualError: any) {
                   if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
-                    console.warn(`⚠️ Failed to insert individual message ${messageData.external_message_id}:`, individualError?.message);
                   }
                   // Skip duplicates silently
                 }
@@ -771,7 +761,6 @@ export class EvolutionApiService {
               successfulInserts += batch.length;
             }
           } catch (batchError: any) {
-            console.warn(`⚠️ Batch insert failed, trying individual inserts:`, batchError?.message);
             
             // Fallback to individual inserts
             for (const messageData of batch) {
@@ -782,14 +771,12 @@ export class EvolutionApiService {
                 successfulInserts++;
               } catch (individualError: any) {
                 if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
-                  console.warn(`⚠️ Failed to insert individual message ${messageData.external_message_id}:`, individualError?.message);
                 }
               }
             }
           }
         }
 
-        console.log(`✅ Successfully inserted ${successfulInserts} messages for conversation ${remoteJid}`);
       }
 
       // After inserting all messages, update the conversation with the truly latest message
@@ -814,7 +801,6 @@ export class EvolutionApiService {
         
         console.log(`✅ Synced ${messages.length} messages for conversation ${remoteJid} - Updated preview: "${latestMessage.content.substring(0, 50)}..."`);
       } else {
-        console.log(`✅ Synced ${messages.length} messages for conversation ${remoteJid}`);
       }
 
     } catch (error) { 
@@ -861,11 +847,9 @@ export class EvolutionApiService {
     errors: string[];
   }> {
     try {
-      console.log(`🔄 Starting full sync for instance: ${instanceName}`);
       
       // Get all recent messages from Evolution API
       const allMessages = await this.fetchAllRecentMessages(instanceName, 1000);
-      console.log(`📋 Found ${allMessages.length} messages to process`);
       
       if (allMessages.length === 0) {
         return { conversationsSynced: 0, messagesSynced: 0, errors: [] };
@@ -883,7 +867,6 @@ export class EvolutionApiService {
         }
       }
       
-      console.log(`📊 Organized into ${conversationMap.size} conversations`);
       
       let conversationsSynced = 0;
       let messagesSynced = 0;
@@ -973,9 +956,7 @@ export class EvolutionApiService {
               contact_name: contactName
             })
             .eq('id', existingConv.id);
-          console.log(`📝 Updated existing group conversation: ${remoteJid} -> ${contactName}`);
         } else {
-          console.log(`📝 Found existing conversation: ${remoteJid}`);
         }
       } else {
         // Find the latest message for preview
@@ -985,68 +966,40 @@ export class EvolutionApiService {
         const latestMessagePreview = this.extractMessageContent(latestMessage).substring(0, 100);
         const latestMessageFrom = latestMessage.key?.fromMe ? 'agent' : 'contact';
 
-        // Check if conversation exists first, then insert or update
-        const { data: existingConvCheck } = await supabase
+        // Use proper upsert with the new unique constraint (user_id, external_conversation_id, instance_key)
+        const { data: newConv, error: convError } = await supabase
           .from('conversations')
+          .upsert({
+            user_id: user.user.id,
+            external_conversation_id: remoteJid,
+            instance_key: instanceName,
+            integration_type: 'whatsapp', // Required field for WhatsApp conversations
+            contact_id: contactId, // Required field - phone number or group ID
+            contact_name: contactName,
+            last_message_at: new Date(Math.max(...messages.map(m => (m.messageTimestamp || 0) * 1000))).toISOString(),
+            last_message_preview: latestMessagePreview,
+            last_message_from: latestMessageFrom,
+            status: 'active',
+            priority: 'medium',
+            tags: [],
+            message_count: 0,
+            conversation_topics: [],
+            last_synced_at: new Date().toISOString(),
+            sync_status: 'synced',
+            contact_metadata: {},
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,external_conversation_id,instance_key'
+          })
           .select('id')
-          .eq('user_id', user.user.id)
-          .eq('external_conversation_id', remoteJid)
-          .eq('instance_key', instanceName)
           .single();
-
-        let convError = null;
-        if (existingConvCheck) {
-          // Update existing conversation
-          const { data: updatedConv, error: updateError } = await supabase
-            .from('conversations')
-            .update({
-              contact_name: contactName,
-              last_message_at: new Date(Math.max(...messages.map(m => (m.messageTimestamp || 0) * 1000))).toISOString(),
-              last_message_preview: latestMessagePreview,
-              last_message_from: latestMessageFrom,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingConvCheck.id)
-            .select('id')
-            .single();
-          
-          conversation = updatedConv;
-          convError = updateError;
-        } else {
-          // Insert new conversation
-          const { data: newConv, error: insertError } = await supabase
-            .from('conversations')
-            .insert({
-              user_id: user.user.id,
-              external_conversation_id: remoteJid,
-              instance_key: instanceName,
-              integration_type: 'whatsapp', // Required field for WhatsApp conversations
-              contact_id: contactId, // Required field - phone number or group ID
-              contact_name: contactName,
-              last_message_at: new Date(Math.max(...messages.map(m => (m.messageTimestamp || 0) * 1000))).toISOString(),
-              last_message_preview: latestMessagePreview,
-              last_message_from: latestMessageFrom,
-              status: 'active',
-              priority: 'medium',
-              tags: [],
-              message_count: 0,
-              conversation_topics: [],
-              last_synced_at: new Date().toISOString(),
-              sync_status: 'synced',
-              contact_metadata: {}
-            })
-            .select('id')
-            .single();
-          
-          conversation = newConv;
-          convError = insertError;
-        }
+        
+        conversation = newConv;
 
         if (convError || !conversation) {
           console.error('❌ Error creating/updating conversation:', convError);
           return;
         }
-        console.log(`✅ Created/updated conversation: ${remoteJid} -> ${contactName}`);
       }
 
       // Insert messages into database
@@ -1104,7 +1057,6 @@ export class EvolutionApiService {
               .insert(batch);
 
             if (insertError) {
-              console.warn(`⚠️ Failed to insert batch of ${batch.length} messages:`, insertError.message);
               
               // Try inserting individual messages to handle any remaining conflicts
               for (const messageData of batch) {
@@ -1115,7 +1067,6 @@ export class EvolutionApiService {
                   successfulInserts++;
                 } catch (individualError: any) {
                   if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
-                    console.warn(`⚠️ Failed to insert individual message ${messageData.external_message_id}:`, individualError?.message);
                   }
                   // Skip duplicates silently
                 }
@@ -1124,7 +1075,6 @@ export class EvolutionApiService {
               successfulInserts += batch.length;
             }
           } catch (batchError: any) {
-            console.warn(`⚠️ Batch insert failed, trying individual inserts:`, batchError?.message);
             
             // Fallback to individual inserts
             for (const messageData of batch) {
@@ -1135,14 +1085,12 @@ export class EvolutionApiService {
                 successfulInserts++;
               } catch (individualError: any) {
                 if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
-                  console.warn(`⚠️ Failed to insert individual message ${messageData.external_message_id}:`, individualError?.message);
                 }
               }
             }
           }
         }
 
-        console.log(`✅ Successfully inserted ${successfulInserts} messages for conversation ${remoteJid}`);
         
         // Update conversation with latest message preview and timestamp
         if (successfulInserts > 0) {
@@ -1157,7 +1105,6 @@ export class EvolutionApiService {
               .single();
 
             if (queryError) {
-              console.warn(`⚠️ Failed to query latest message for ${remoteJid}:`, queryError.message);
               return;
             }
 
@@ -1173,13 +1120,11 @@ export class EvolutionApiService {
                 .eq('id', conversation.id);
 
               if (updateError) {
-                console.warn(`⚠️ Failed to update conversation preview for ${remoteJid}:`, updateError.message);
               } else {
                 console.log(`✅ Updated conversation preview for ${remoteJid}: "${latestMessageData.content.substring(0, 50)}..."`);
               }
             }
           } catch (updateError) {
-            console.warn(`⚠️ Error updating conversation preview for ${remoteJid}:`, updateError);
           }
         }
       }

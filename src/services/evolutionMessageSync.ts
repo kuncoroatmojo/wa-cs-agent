@@ -344,7 +344,6 @@ export class EvolutionMessageSyncService {
 
 
       if (progress.errors.length > 0) {
-        console.warn(`Sync completed with ${progress.errors.length} errors`);
       }
 
     } catch (error) { 
@@ -441,7 +440,12 @@ export class EvolutionMessageSyncService {
 
       const { data: newConv, error: convError } = await this.supabase
         .from('conversations')
-        .insert(conversationData)
+        .upsert({
+          ...conversationData,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,external_conversation_id,instance_key'
+        })
         .select()
         .single();
 
@@ -560,7 +564,6 @@ export class EvolutionMessageSyncService {
       
       // Progress update for large conversations
       if (newMessages.length > 100 && processedCount % 100 === 0) {
-        console.log(`Processed ${processedCount}/${newMessages.length} messages for conversation ${remoteJid}`);
       }
     }
 

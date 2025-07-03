@@ -10,7 +10,7 @@ import { evolutionApiService } from '../services/evolutionApiService';
 import { conversationService } from '../services/conversationService';
 import { toast } from 'react-hot-toast';
 import type { WhatsAppInstance } from '../types';
-import { WHATSAPP_CONFIG } from '../constants';
+import { getUserTargetInstance, hasTargetInstance } from '../utils/userSettings';
 
 const WhatsAppInstances: React.FC = () => {
   const navigate = useNavigate();
@@ -40,19 +40,23 @@ const WhatsAppInstances: React.FC = () => {
   useEffect(() => {
     fetchInstances();
     if (isEvolutionConfigured) {
-      syncEvolutionInstances();
+      const targetInstance = getUserTargetInstance(profile);
+      syncEvolutionInstances(targetInstance || undefined);
     }
-  }, [fetchInstances, isEvolutionConfigured, syncEvolutionInstances]);
+  }, [fetchInstances, isEvolutionConfigured, syncEvolutionInstances, profile]);
 
   // Show target instance info
   const targetInstanceInfo = React.useMemo(() => {
-    const targetInstance = WHATSAPP_CONFIG.TARGET_INSTANCE;
+    const targetInstance = getUserTargetInstance(profile);
     if (!targetInstance) {
       return (
         <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
           <h3 className="text-yellow-800 font-medium">⚠️ No Target Instance Configured</h3>
           <p className="text-yellow-700 text-sm mt-1">
-            Please set the VITE_WHATSAPP_TARGET_INSTANCE environment variable.
+            No WhatsApp target instance is configured for your account. You won't see any instances or conversations until this is set.
+          </p>
+          <p className="text-yellow-700 text-sm mt-2">
+            Please contact your administrator to configure your target instance.
           </p>
         </div>
       );
@@ -61,15 +65,15 @@ const WhatsAppInstances: React.FC = () => {
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
         <h3 className="text-blue-800 font-medium">🎯 Target Instance: {targetInstance}</h3>
         <p className="text-blue-700 text-sm mt-1">
-          This environment is configured to only show and manage the "{targetInstance}" instance.
+          Your account is configured to only show and manage the "{targetInstance}" instance.
         </p>
       </div>
     );
-  }, []);
+  }, [profile]);
 
   // Combine database instances with Evolution API instances and filter by target instance
   const allInstances = React.useMemo(() => {
-    const targetInstance = WHATSAPP_CONFIG.TARGET_INSTANCE;
+    const targetInstance = getUserTargetInstance(profile);
     if (!targetInstance) return [];
     
     // Filter database instances to only show the target instance
@@ -112,9 +116,14 @@ const WhatsAppInstances: React.FC = () => {
     if (!profile) return;
 
     // Enforce target instance name
-    const targetInstance = WHATSAPP_CONFIG.TARGET_INSTANCE;
+    const targetInstance = getUserTargetInstance(profile);
+    if (!targetInstance) {
+      toast.error('No target instance configured for your account');
+      return;
+    }
+    
     if (name !== targetInstance) {
-      toast.error(`Instance name must be "${targetInstance}" for this environment`);
+      toast.error(`Instance name must be "${targetInstance}" for your account`);
       return;
     }
 
@@ -129,7 +138,7 @@ const WhatsAppInstances: React.FC = () => {
       
       // If Evolution API is configured and this is an evolution_api instance, sync
       if (connectionType === 'evolution_api' && isEvolutionConfigured) {
-        await syncEvolutionInstances();
+        await syncEvolutionInstances(targetInstance);
       }
     }
   };
@@ -276,7 +285,6 @@ const WhatsAppInstances: React.FC = () => {
                 if (attempts < maxAttempts) {
                   setTimeout(checkStatus, 5000); // Check every 5 seconds
                 } else {
-                  console.warn("Maximum connection attempts reached, stopping monitoring");
                 }
                 
               } catch (error) { 
@@ -334,7 +342,6 @@ const WhatsAppInstances: React.FC = () => {
       
       // Use the improved sync approach with proper Evolution API endpoints
       if (instance.connectionType === 'evolution_api') {
-        console.log('📨 Syncing all conversations and messages from Evolution API...');
         
         // Use the new direct sync method
         const result = await evolutionApiService.syncAllConversationsAndMessages(instance.instanceKey);
@@ -637,72 +644,85 @@ interface CreateInstanceModalProps {
 }
 
 const CreateInstanceModal: React.FC<CreateInstanceModalProps> = ({ onClose, onCreate }) => {
-  const [name, setName] = useState(WHATSAPP_CONFIG.TARGET_INSTANCE);
+  const { profile } = useAuthStore();
+  const [name, setName] = useState(getUserTargetInstance(profile) || '');
   const [connectionType, setConnectionType] = useState<'baileys' | 'cloud_api' | 'evolution_api'>('evolution_api');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      await onCreate(name.trim(), connectionType);
-    }
+    if (!name.trim()) return;
+    
+    await onCreate(name, connectionType);
   };
 
+  const targetInstance = getUserTargetInstance(profile);
+
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div className="mt-3">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Create New WhatsApp Instance</h3>
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                Instance Name (Environment Locked)
-              </label>
-              <input
-                type="text"
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
-                placeholder="Enter instance name"
-                required
-                readOnly
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                This environment is configured to only use the "{WHATSAPP_CONFIG.TARGET_INSTANCE}" instance
-              </p>
-            </div>
-            <div className="mb-4">
-              <label htmlFor="connectionType" className="block text-sm font-medium text-gray-700 mb-2">
-                Connection Type
-              </label>
-              <select
-                id="connectionType"
-                value={connectionType}
-                onChange={(e) => setConnectionType(e.target.value as 'baileys' | 'cloud_api' | 'evolution_api')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="baileys">Baileys (Open Source)</option>
-                <option value="evolution_api">Evolution API</option>
-                <option value="cloud_api">Cloud API (Official)</option>
-              </select>
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
-              >
-                Create Instance
-              </button>
-            </div>
-          </form>
-        </div>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold mb-4">Create WhatsApp Instance</h3>
+        
+        {!targetInstance ? (
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
+            <p className="text-yellow-800 text-sm">
+              No target instance configured for your account. Please contact your administrator.
+            </p>
+          </div>
+        ) : (
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+            <p className="text-blue-800 text-sm">
+              This environment is configured to only use the "{targetInstance}" instance
+            </p>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+              Instance Name (Environment Locked)
+            </label>
+            <input
+              type="text"
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+              placeholder="Enter instance name"
+              required
+              readOnly
+            />
+          </div>
+          <div className="mb-4">
+            <label htmlFor="connectionType" className="block text-sm font-medium text-gray-700 mb-2">
+              Connection Type
+            </label>
+            <select
+              id="connectionType"
+              value={connectionType}
+              onChange={(e) => setConnectionType(e.target.value as 'baileys' | 'cloud_api' | 'evolution_api')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="baileys">Baileys (Open Source)</option>
+              <option value="evolution_api">Evolution API</option>
+              <option value="cloud_api">Cloud API (Official)</option>
+            </select>
+          </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+            >
+              Create Instance
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

@@ -297,6 +297,7 @@ export interface Profile {
   full_name?: string;
   avatar_url?: string;
   role: string;
+  whatsapp_target_instance?: string;
   created_at: string;
   updated_at: string;
 }

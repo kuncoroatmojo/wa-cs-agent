@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useEvolutionApiStore } from '../store/evolutionApiStore';
+import { getUserTargetInstance } from '../utils/userSettings';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { toast } from 'react-hot-toast';
 
 const Settings: React.FC = () => {
-  const { profile } = useAuthStore();
+  const { profile, updateProfile } = useAuthStore();
   const {
     config: evolutionConfig,
     isConfigured: isEvolutionConfigured,
@@ -26,6 +28,7 @@ const Settings: React.FC = () => {
   const [formData, setFormData] = useState({
     name: profile?.full_name || '',
     email: profile?.email || '',
+    whatsappTargetInstance: getUserTargetInstance(profile) || '',
     evolutionApiUrl: evolutionConfig?.baseUrl || '',
     evolutionApiKey: evolutionConfig?.apiKey || '',
     openaiApiKey: '',
@@ -63,11 +66,33 @@ const Settings: React.FC = () => {
     }));
   };
 
-  const handleSave = async (_section: string) => {
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsLoading(false);
+  const handleSave = async (section: string) => {
+    if (section === 'profile') {
+      setIsLoading(true);
+      try {
+        // Update profile including WhatsApp target instance
+        const result = await updateProfile({
+          full_name: formData.name,
+          email: formData.email,
+          whatsapp_target_instance: formData.whatsappTargetInstance || undefined
+        });
+
+        if (result.success) {
+          toast.success('Profile updated successfully');
+        } else {
+          toast.error(result.error || 'Failed to update profile');
+        }
+      } catch (error) {
+        toast.error('Failed to update profile');
+        console.error('Profile update error:', error);
+      }
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+      // Simulate API call for other sections
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setIsLoading(false);
+    }
   };
 
   const renderProfileSettings = () => (
@@ -123,6 +148,24 @@ const Settings: React.FC = () => {
               onChange={handleChange}
               className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
             />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label htmlFor="whatsappTargetInstance" className="block text-sm font-medium text-gray-700">
+              WhatsApp Target Instance
+            </label>
+            <input
+              type="text"
+              name="whatsappTargetInstance"
+              id="whatsappTargetInstance"
+              value={formData.whatsappTargetInstance}
+              onChange={handleChange}
+              placeholder="e.g., istn"
+              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+            />
+            <p className="mt-2 text-sm text-gray-500">
+              The specific WhatsApp instance key you want to target. When empty, you won't see any WhatsApp instances or conversations.
+            </p>
           </div>
         </div>
 

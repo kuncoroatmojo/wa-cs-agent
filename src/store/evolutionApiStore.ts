@@ -19,8 +19,8 @@ interface EvolutionApiStore {
   testConnection: () => Promise<{ success: boolean; error?: string }>;
   
   // Instance management
-  fetchInstances: () => Promise<void>;
-  syncInstances: () => Promise<void>;
+  fetchInstances: (targetInstance?: string) => Promise<void>;
+  syncInstances: (targetInstance?: string) => Promise<void>;
   createInstance: (instanceName: string, token?: string) => Promise<EvolutionInstance>;
   deleteInstance: (instanceName: string) => Promise<void>;
   connectInstance: (instanceName: string) => Promise<{ qrcode?: { code: string; base64: string } }>;
@@ -117,7 +117,7 @@ export const useEvolutionApiStore = create<EvolutionApiStore>()(
       },
 
       // Instance management actions
-      fetchInstances: async () => {
+      fetchInstances: async (targetInstance?: string) => {
         const { isConfigured } = get();
         if (!isConfigured) {
           set({ error: 'Evolution API not configured' });
@@ -127,7 +127,7 @@ export const useEvolutionApiStore = create<EvolutionApiStore>()(
         set({ loading: true, error: null });
         
         try {
-          const instances = await evolutionApiService.fetchInstances();
+          const instances = await evolutionApiService.fetchInstances(targetInstance);
           set({ 
             instances,
             loading: false,
@@ -142,7 +142,7 @@ export const useEvolutionApiStore = create<EvolutionApiStore>()(
         }
       },
 
-      syncInstances: async () => {
+      syncInstances: async (targetInstance?: string) => {
         const { isConfigured } = get();
         if (!isConfigured) {
           set({ error: 'Evolution API not configured' });
@@ -154,7 +154,7 @@ export const useEvolutionApiStore = create<EvolutionApiStore>()(
         try {
           await evolutionApiService.syncInstancesWithDatabase();
           // Refresh instances after sync
-          const instances = await evolutionApiService.fetchInstances();
+          const instances = await evolutionApiService.fetchInstances(targetInstance);
           set({ 
             instances,
             loading: false,

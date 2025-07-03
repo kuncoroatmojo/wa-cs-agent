@@ -224,42 +224,15 @@ export class ConversationService {
    */
   async upsertConversation(conversation: Partial<UnifiedConversation>): Promise<UnifiedConversation> {
     try {
-      // First, check for existing conversation using external_conversation_id and instance_key
-      if (conversation.external_conversation_id && conversation.instance_key) {
-        const { data: existingConversations } = await this.supabase
-          .from('conversations')
-          .select('*')
-          .eq('external_conversation_id', conversation.external_conversation_id)
-          .eq('instance_key', conversation.instance_key)
-          .limit(1);
-
-        if (existingConversations && existingConversations.length > 0) {
-          // Update the existing conversation
-          const existingConv = existingConversations[0];
-          const { data, error } = await this.supabase
-            .from('conversations')
-            .update({
-              ...conversation,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingConv.id)
-            .select()
-            .single();
-
-          if (error) {
-            console.error('❌ Error updating existing conversation:', error);
-            throw error;
-          }
-
-          return data;
-        }
-      }
-
-      // If no existing conversation found, create a new one
+      // Use proper upsert with the new unique constraint
+      // The unique constraint is now: (user_id, external_conversation_id, instance_key)
       const { data, error } = await this.supabase
         .from('conversations')
-        .upsert(conversation, {
-          onConflict: 'user_id,integration_type,contact_id,integration_id'
+        .upsert({
+          ...conversation,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,external_conversation_id,instance_key'
         })
         .select()
         .single();
@@ -439,7 +412,6 @@ export class ConversationService {
       }
 
       if (errors.length > 0) {
-        console.warn(`Sync completed with ${errors.length} errors`);
         console.warn(`Sync completed with ${errors.length} errors`);
       }
 

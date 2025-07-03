@@ -365,18 +365,15 @@ const Conversations: React.FC = () => {
   useEffect(() => {
     const refreshParam = searchParams.get('refresh')
     if (refreshParam && profile) {
-      console.log('🔄 Forced refresh triggered from URL parameter')
       // Immediate refresh
       loadConversations()
       
       // Also schedule additional refreshes to catch any delayed updates
       const refreshTimeout1 = setTimeout(() => {
-        console.log('🔄 Secondary refresh after 1 second')
         loadConversations()
       }, 1000)
       
       const refreshTimeout2 = setTimeout(() => {
-        console.log('🔄 Final refresh after 3 seconds')
         loadConversations()
       }, 3000)
       
@@ -409,7 +406,6 @@ const Conversations: React.FC = () => {
           filter: `user_id=eq.${profile.id}`
         },
         async (payload) => {
-          console.log('🔄 Conversation change received:', payload)
           // Reload conversations to get the latest state
           await loadConversations()
         }
@@ -430,7 +426,6 @@ const Conversations: React.FC = () => {
             filter: `conversation_id=eq.${selectedConversation.id}`
           },
           async (payload) => {
-            console.log('🔄 Message change received:', payload)
             // Reload messages to get the latest state
             await loadMessages(selectedConversation.id)
           }
