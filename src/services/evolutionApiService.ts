@@ -208,10 +208,18 @@ export class EvolutionApiService {
       }
       
       const result = await response.json();
-      console.log('🔍 Raw Evolution API response:', JSON.stringify(result, null, 2));
       
       const allInstances = result.instances || result || [];
-      console.log(`📱 Processed ${allInstances.length} instances from API`);
+      
+      // Only log details if we're looking for a specific target instance
+      if (targetInstance) {
+        const targetInstances = allInstances.filter((instance: any) => 
+          (instance.instanceName || instance.name) === targetInstance
+        );
+        console.log(`🎯 Found ${targetInstances.length} instances matching target "${targetInstance}"`);
+      } else {
+        console.log(`📱 Processed ${allInstances.length} instances from API`);
+      }
       
       // Validate instances and log any issues
       const validInstances = allInstances.filter((instance: any, index: number) => {
@@ -1436,6 +1444,12 @@ export class EvolutionApiService {
           console.warn('⚠️ Skipping instance without valid name:', evolutionInstance);
           continue;
         }
+        
+        // Skip if target instance is specified and this is not it
+        if (targetInstance && instanceName !== targetInstance) {
+          console.log(`⏭️ Skipping non-target instance during insert: ${instanceName}`);
+          continue;
+        }
 
         if (!existingInstanceKeys.has(instanceName)) {
           const { error: insertError } = await supabase
@@ -1468,6 +1482,12 @@ export class EvolutionApiService {
         const instanceName = evolutionInstance.instanceName || (evolutionInstance as any).name;
         if (!instanceName) {
           console.warn('⚠️ Skipping instance without valid name for update:', evolutionInstance);
+          continue;
+        }
+        
+        // Skip if target instance is specified and this is not it
+        if (targetInstance && instanceName !== targetInstance) {
+          console.log(`⏭️ Skipping non-target instance during update: ${instanceName}`);
           continue;
         }
 

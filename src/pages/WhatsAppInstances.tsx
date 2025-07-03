@@ -274,7 +274,8 @@ const WhatsAppInstances: React.FC = () => {
                   
                   // Refresh the instances to update the UI
                   await fetchInstances();
-                  await syncEvolutionInstances();
+                  const targetInstance = getUserTargetInstance(profile);
+                  await syncEvolutionInstances(targetInstance || undefined);
                   
                   return true; // Stop monitoring
                 }
@@ -303,7 +304,8 @@ const WhatsAppInstances: React.FC = () => {
         
         // Refresh both stores
         await fetchInstances();
-        await syncEvolutionInstances();
+        const targetInstance = getUserTargetInstance(profile);
+        await syncEvolutionInstances(targetInstance || undefined);
       } else {
         // Use our custom WhatsApp service with mock backend
         const connectResponse = await whatsappService.initializeConnection(instanceId);
