@@ -88,10 +88,10 @@ const Settings: React.FC = () => {
       }
       setIsLoading(false);
     } else {
-      setIsLoading(true);
+    setIsLoading(true);
       // Simulate API call for other sections
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setIsLoading(false);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsLoading(false);
     }
   };
 

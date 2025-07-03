@@ -152,7 +152,8 @@ export const useEvolutionApiStore = create<EvolutionApiStore>()(
         set({ loading: true, error: null });
         
         try {
-          await evolutionApiService.syncInstancesWithDatabase();
+          // Pass targetInstance to sync only the user's target instance
+          await evolutionApiService.syncInstancesWithDatabase(targetInstance);
           // Refresh instances after sync
           const instances = await evolutionApiService.fetchInstances(targetInstance);
           set({ 

@@ -1385,7 +1385,7 @@ export class EvolutionApiService {
   /**
    * Sync Evolution API instances with our database
    */
-  async syncInstancesWithDatabase(): Promise<void> {
+  async syncInstancesWithDatabase(targetInstance?: string): Promise<void> {
     try {
       // Cache bust: Force fresh deployment - v2.1
       // Get current user
@@ -1394,11 +1394,20 @@ export class EvolutionApiService {
         throw new Error('No authenticated user');
       }
 
-      // Fetch instances from Evolution API
-      const evolutionInstances = await this.fetchInstances();
+      // Fetch instances from Evolution API, filtered by target instance if provided
+      const evolutionInstances = await this.fetchInstances(targetInstance);
       
       console.log('🔄 Syncing instances with database...');
+      if (targetInstance) {
+        console.log(`🎯 Filtering for target instance: ${targetInstance}`);
+      }
       console.log(`📊 Found ${evolutionInstances.length} instances from Evolution API`);
+      
+      // If target instance is specified but not found, return early
+      if (targetInstance && evolutionInstances.length === 0) {
+        console.log(`⚠️ Target instance "${targetInstance}" not found in Evolution API`);
+        return;
+      }
       
       // Debug log the instance structure
       if (evolutionInstances.length > 0) {
@@ -1447,7 +1456,7 @@ export class EvolutionApiService {
           } else {
             
             // Verify and fix webhook for new instance
-            await this.verifyAndFixWebhook(instanceName);
+            await this.verifyAndFixWebhook(instanceName, targetInstance);
           }
         }
       }
@@ -1477,7 +1486,7 @@ export class EvolutionApiService {
             console.error('Failed to update instance:', updateError);
           } else {
             // Verify and fix webhook for existing instance
-            await this.verifyAndFixWebhook(instanceName);
+            await this.verifyAndFixWebhook(instanceName, targetInstance);
           }
         }
       }
@@ -1615,8 +1624,13 @@ export class EvolutionApiService {
   /**
    * Verify and fix webhook configuration for an instance
    */
-  async verifyAndFixWebhook(instanceName: string): Promise<boolean> {
+  async verifyAndFixWebhook(instanceName: string, targetInstance?: string): Promise<boolean> {
     try {
+      // If target instance is specified and this is not it, skip
+      if (targetInstance && instanceName !== targetInstance) {
+        console.log(`⏭️ Skipping webhook setup for non-target instance: ${instanceName}`);
+        return true;
+      }
       
       const webhookUrl = `${import.meta.env.SUPABASE_URL}/functions/v1/whatsapp-webhook`;
       
@@ -1643,15 +1657,17 @@ export class EvolutionApiService {
   /**
    * Verify and fix webhook configuration for all instances
    */
-  async verifyAndFixAllWebhooks(): Promise<void> {
+  async verifyAndFixAllWebhooks(targetInstance?: string): Promise<void> {
     try {
       
-      const instances = await this.fetchInstances();
+      const instances = await this.fetchInstances(targetInstance);
+      
+      console.log(`🔧 Verifying webhooks for ${instances.length} instances${targetInstance ? ` (filtered to: ${targetInstance})` : ''}`);
       
       for (const instance of instances) {
         const instanceName = instance.instanceName || (instance as any).name;
         if (instanceName) {
-          await this.verifyAndFixWebhook(instanceName);
+          await this.verifyAndFixWebhook(instanceName, targetInstance);
         }
       }
       
