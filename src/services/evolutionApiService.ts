@@ -1362,7 +1362,7 @@ export class EvolutionApiService {
    */
   async syncInstancesWithDatabase(): Promise<void> {
     try {
-
+      // Cache bust: Force fresh deployment - v2.1
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
