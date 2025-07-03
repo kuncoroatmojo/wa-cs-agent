@@ -41,7 +41,7 @@ export const validateUrl = (url: string): boolean => {
 }
 
 export const validatePhone = (phone: string): boolean => {
-  return /^\+?[\d\s\-\(\)]+$/.test(phone)
+  return /^\+?[\d\s\-()]+$/.test(phone)
 }
 
 export const validateRequired = (value: any): boolean => {

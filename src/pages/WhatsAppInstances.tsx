@@ -4,13 +4,11 @@ import { useWhatsAppStore } from '../store/whatsappStore';
 import { useAuthStore } from '../store/authStore';
 import { useEvolutionApiStore } from '../store/evolutionApiStore';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { supabase } from '../lib/supabase';
 import { whatsappService } from '../services/whatsappService';
 import { evolutionApiService } from '../services/evolutionApiService';
-import { conversationService } from '../services/conversationService';
 import { toast } from 'react-hot-toast';
 import type { WhatsAppInstance } from '../types';
-import { getUserTargetInstance, hasTargetInstance } from '../utils/userSettings';
+import { getUserTargetInstance } from '../utils/userSettings';
 
 const WhatsAppInstances: React.FC = () => {
   const navigate = useNavigate();
@@ -285,6 +283,7 @@ const WhatsAppInstances: React.FC = () => {
                 if (attempts < maxAttempts) {
                   setTimeout(checkStatus, 5000); // Check every 5 seconds
                 } else {
+                  console.log('Max connection attempts reached, stopping monitoring');
                 }
                 
               } catch (error) { 
@@ -400,7 +399,7 @@ const WhatsAppInstances: React.FC = () => {
     }
   };
 
-  const handleDelete = async (instance: WhatsAppInstance) => {
+  const _handleDelete = async (instance: WhatsAppInstance) => {
     if (!confirm(`Are you sure you want to delete the instance "${instance.name}"? This will remove it from both Evolution API and your database.`)) {
       return;
     }

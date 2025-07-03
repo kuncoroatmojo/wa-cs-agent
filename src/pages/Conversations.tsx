@@ -1,19 +1,16 @@
 import React, { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { useChatStore } from '../store/chatStore'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { conversationService, type UnifiedConversation } from '../services/conversationService'
 import { supabase } from '../lib/supabase'
 import type { UnifiedMessage } from '../types'
 import { 
-  ChatBubbleLeftRightIcon,
-  PaperAirplaneIcon,
-  ComputerDesktopIcon,
-  PhoneIcon,
-  GlobeAltIcon,
-  PlusIcon,
-  MagnifyingGlassIcon,
-  AdjustmentsHorizontalIcon
+  ArrowRightIcon,
+  EllipsisVerticalIcon,
+  CheckIcon,
+  XMarkIcon,
+  UserIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline'
 import { 
   Phone,
@@ -21,14 +18,16 @@ import {
   MoreVertical,
   Send,
   Search,
-  Filter,
   Users,
   MessageSquare,
   Clock,
   CheckCircle2
 } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { format } from 'date-fns'
 import LoadingSpinner from '../components/LoadingSpinner'
+import { chatService } from '../services/chatService'
+import { performanceService } from '../services/performanceService'
+import { toast } from 'react-hot-toast'
 
 interface ConversationListProps {
   conversations: UnifiedConversation[];
@@ -349,7 +348,7 @@ const Conversations: React.FC = () => {
   const [selectedConversation, setSelectedConversation] = useState<UnifiedConversation | null>(null)
   const [messages, setMessages] = useState<UnifiedMessage[]>([])
   const [loading, setLoading] = useState(true)
-  const [sendingMessage, setSendingMessage] = useState(false)
+  const [_sendingMessage, _setSendingMessage] = useState(false)
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'resolved'>('all')
@@ -526,7 +525,7 @@ const Conversations: React.FC = () => {
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
                 title="Refresh conversations"
               >
-                <Clock className="h-5 w-5" />
+                <ClockIcon className="h-5 w-5" />
               </button>
             </div>
           </div>

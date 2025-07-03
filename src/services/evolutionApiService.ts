@@ -757,7 +757,7 @@ export class EvolutionApiService {
             } else {
               _successfulInserts += batch.length;
             }
-          } catch (_batchError: any) {
+          } catch (batchError: any) {
             
             // Fallback to individual inserts
             for (const messageData of batch) {
@@ -1074,7 +1074,7 @@ export class EvolutionApiService {
             } else {
               _successfulInserts += batch.length;
             }
-          } catch (_batchError: any) {
+          } catch (batchError: any) {
             
             // Fallback to individual inserts
             for (const messageData of batch) {

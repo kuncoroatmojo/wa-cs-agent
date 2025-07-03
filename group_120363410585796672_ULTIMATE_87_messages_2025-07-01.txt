@@ -1,0 +1,432 @@
+WhatsApp Group Messages Export - ULTIMATE COMPLETE HISTORY
+================================================================
+Group ID: 120363410585796672
+Remote JID: 120363410585796672@g.us
+Total Messages: 87 (merged from 4 instances)
+Date Range: 06/18/2025, 19:29:49 → 07/01/2025, 13:25:56
+Export Date: 2025-07-01T17:44:32.552Z
+
+Instance Sources:
+  • firman: 50 messages (0 duplicates removed)
+  • kunco: 50 messages (28 duplicates removed)
+  • istn: 50 messages (35 duplicates removed)
+================================================================
+
+[1] 06/18/2025, 19:29:49 ← 120363410585796672@g.us
+@6287889441564 @62895332028757 kita pernah diminta submit data lkps/data lain apa aja terkait ini?
+   (Source: firman)
+
+[2] 06/18/2025, 19:46:50 ← 120363410585796672@g.us
+Info seperti ini kenapa baru sampai ke saya h-1 sore ya 🥲
+   (Source: firman)
+
+[3] 06/18/2025, 19:47:34 ← 120363410585796672@g.us
+@6287889441564 @62895332028757 jam 8.30 besok tolong standby di kampus ya
+   (Source: firman)
+
+[4] 06/18/2025, 19:47:38 ← 120363410585796672@g.us
+Baru dishare juga mas tadi sama mba ana pas lagi setting printer
+   (Source: firman)
+
+[5] 06/18/2025, 19:47:52 ← 120363410585796672@g.us
+Siapp
+   (Source: firman)
+
+[6] 06/18/2025, 19:52:48 ← 120363410585796672@g.us
+Mereka ini maunya gimana ya mad
+   (Source: firman)
+
+[7] 06/18/2025, 19:53:12 ← 120363410585796672@g.us
+Udah gagal akreditasi padahal
+   (Source: firman)
+
+[8] 06/18/2025, 19:53:30 ← 120363410585796672@g.us
+Gatau mas. Kaya tahu bulet, dadakan. Kemaren request printer 1. Pas didatengin tbtb minta 2
+   (Source: firman)
+
+[9] 06/19/2025, 12:17:50 ← 120363410585796672@g.us
+ternyata akreditasi cek lab & server besok ya
+   (Source: firman)
+
+[10] 06/19/2025, 12:18:01 ← 120363410585796672@g.us
+@6287889441564 ups aman?
+   (Source: firman)
+
+[11] 06/19/2025, 12:46:10 ← 120363410585796672@g.us
+[IMAGE] Baru sampe toko pak, lgi pada istirahat adminnya.
+   (Type: imageMessage)
+   (Source: firman)
+
+[12] 06/19/2025, 13:13:09 ← 120363410585796672@g.us
+[IMAGEMESSAGE]
+   (Type: imageMessage)
+   (Source: firman)
+
+[13] 06/19/2025, 14:18:57 ← 120363410585796672@g.us
+[IMAGE] Sudh sampe kampus
+   (Type: imageMessage)
+   (Source: firman)
+
+[14] 06/19/2025, 14:34:22 ← 120363410585796672@g.us
+@62895332028757 bala tentara farmasi yg besok cbt bisa bantu pasang?
+   (Source: firman)
+
+[15] 06/19/2025, 17:18:18 ← 120363410585796672@g.us
+[VIDEO] Proses pergantian batre mas @6281321249433
+   (Type: videoMessage)
+   (Source: firman)
+
+[16] 06/20/2025, 09:17:21 ← 120363410585796672@g.us
+koordinasi Asesmen Lapangan yang akan dilaksanakan pada :
+Hari/Tanggal
+Pukul
+Tempat
+Agenda
+: Jumat / 20 Juni 2025
+: 14.00 Wib - Selesai
+: Ruang Serbaguna Lt 2 Fakultas Teknik
+: Koordinasi AL Reakreditasi Sarjana Teknik Elektro
+   (Source: firman)
+
+[17] 06/20/2025, 09:17:21 ← 120363410585796672@g.us
+[DOCUMENT: Undangan Rapat Koordinasi AL Reakreditasi Prodi Sarjana Teknik Elektro.pdf]
+   (Type: documentMessage)
+   (Source: firman)
+
+[18] 06/20/2025, 09:18:24 ← 120363410585796672@g.us
+@62895332028757 minta tolong datang. Take notes aja dtc kira2 perlu bantu apa
+   (Source: firman)
+
+[19] 06/23/2025, 09:17:48 ← 120363410585796672@g.us
+@6287889441564 minta tolong carikan data mahasiswa elektro di istn prima untuk akreditasi hari ini. Detailnya tahun berapa aja bisa koordinasi ke mba shindi spmi 🙏
+   (Source: firman)
+
+[20] 06/23/2025, 09:26:21 ← 120363410585796672@g.us
+[IMAGE] Ok,sdh ready
+   (Type: imageMessage)
+   (Source: firman)
+
+[21] 06/23/2025, 09:26:58 ← 120363410585796672@g.us
+[COMPLEX_MESSAGE]
+   (Type: protocolMessage)
+   (Source: firman)
+
+[22] 06/23/2025, 09:30:55 ← 120363410585796672@g.us
+Terimakasih 🙏
+   (Source: firman)
+
+[23] 06/25/2025, 07:19:01 ← 120363410585796672@g.us
+@6287889441564 tolong siapkan HT untuk dipinjam acara simposium.
+Wifi/access point juga apakah sudah aman untuk simposium besok?
+Terimakasih, tolong dibantu
+   (Source: firman)
+
+[24] 06/25/2025, 07:21:01 ← 120363410585796672@g.us
+HT uda kupinjam dan uda kuambil sama @628561566687
+   (Source: firman)
+
+[25] 06/25/2025, 07:23:31 ← 120363410585796672@g.us
+zoom sama sevima terkait penggunaan edlink kaya bseok
+   (Source: firman)
+
+[26] 06/25/2025, 07:23:31 ← 120363410585796672@g.us
+Mas. Dapet salam dari pak Wayan
+   (Source: firman)
+
+[27] 06/25/2025, 07:23:32 ← 120363410585796672@g.us
+[AUDIOMESSAGE]
+   (Type: audioMessage)
+   (Source: firman)
+
+[28] 06/25/2025, 07:24:45 ← 120363410585796672@g.us
+@6281321249433, saya dapet info dari @62895332028757 yang katanya dari pak wayan yang ternyata dari edy
+   (Source: firman)
+
+[29] 06/25/2025, 07:28:47 ← 120363410585796672@g.us
+saya izin untuk mempersiapkan symposium permintaan langsung dari pak rektor, bu rivira dan mas ardi
+   (Source: firman)
+
+[30] 06/25/2025, 08:00:30 ← 120363410585796672@g.us
+@62895332028757 @6287889441564 @6282211777301 minta tolong bantu irsandi mempersiapkan simposium, sudah h-1.
+@6281287502645 tolong sampaikan kalau ada yg bisa dibantu tim dtc ya
+   (Source: firman)
+
+[31] 06/25/2025, 08:07:34 ← 120363410585796672@g.us
+Mas @6287889441564 dan mas @62895332028757, minta tolong bantu mas Dhika untuk jaringan, dokumentasi, dan multimedia
+   (Source: firman)
+
+[32] 06/25/2025, 08:41:20 ← 120363410585796672@g.us
+Untuk jaringan hri ini saya pasang pak, HT tdi sore sudh di ambil mas firman.
+   (Source: firman)
+
+[33] 06/25/2025, 11:08:11 ← 120363410585796672@g.us
+sip makasih. minta tolong update nanti kita test ya
+   (Source: firman)
+
+[34] 06/25/2025, 15:07:01 ← 120363410585796672@g.us
+[DOCUMENT: aula rooseno-Model-2_Flatten.pdf]
+   (Type: documentMessage)
+   (Source: firman)
+
+[35] 06/25/2025, 15:07:14 ← 120363410585796672@g.us
+@6287889441564 @62895332028757
+   (Source: firman)
+
+[36] 06/25/2025, 15:31:07 ← 120363410585796672@g.us
+Wifi : ISTN WIFI 3
+Password: istn1950
+   (Source: firman)
+
+[37] 06/25/2025, 15:31:16 ← 120363410585796672@g.us
+Wifi sudh di pasang
+   (Source: firman)
+
+[38] 06/25/2025, 15:31:41 ← 120363410585796672@g.us
+Makasi mas @6287889441564 dan mas @62895332028757 🙏
+   (Source: firman)
+
+[39] 06/25/2025, 15:31:43 ← 120363410585796672@g.us
+[UNKNOWN_MESSAGE_TYPE]
+   (Type: unknown)
+   (Source: firman)
+
+[40] 06/25/2025, 15:31:43 ← 120363410585796672@g.us
+[IMAGEMESSAGE]
+   (Type: imageMessage)
+   (Source: firman)
+
+[41] 06/25/2025, 15:31:44 ← 120363410585796672@g.us
+[IMAGEMESSAGE]
+   (Type: imageMessage)
+   (Source: firman)
+
+[42] 06/25/2025, 15:31:44 ← 120363410585796672@g.us
+[IMAGEMESSAGE]
+   (Type: imageMessage)
+   (Source: firman)
+
+[43] 06/25/2025, 15:31:45 ← 120363410585796672@g.us
+[IMAGEMESSAGE]
+   (Type: imageMessage)
+   (Source: firman)
+
+[44] 06/25/2025, 15:31:46 ← 120363410585796672@g.us
+[IMAGEMESSAGE]
+   (Type: imageMessage)
+   (Source: firman)
+
+[45] 06/25/2025, 15:38:28 ← 120363410585796672@g.us
+[IMAGE] Untuk kabel internet operator juga sudh oke, tinggal colok ke laptop
+   (Type: imageMessage)
+   (Source: firman)
+
+[46] 06/25/2025, 18:14:35 ← 120363410585796672@g.us
+mantap thankyou ihsan. besok ada dua laptop yg bisa dipinjam untuk acara nggak ya?
+   (Source: firman)
+
+[47] 06/25/2025, 18:16:19 ← 120363410585796672@g.us
+@6287889441564 @62895332028757 @6282211777301 besok tolong standby full day bantu acara dari pagi ya. Terimakasih
+   (Source: firman)
+
+[48] 06/25/2025, 19:34:20 ← 120363410585796672@g.us
+Laptop sudh d siapkan, udh d bawa mas irsandi 2, sama kabel listrik juga
+   (Source: firman)
+
+[49] 06/25/2025, 22:24:00 ← 120363410585796672@g.us
+Urgent @6287889441564 tolong disiapkan broadcast acara simposium ke ruang A4, A5, A6 (proyektor ke screen depan kelas, semacam kelas hybrid). Diusahakan ready besok jam 8.30 🙏
+   (Source: firman)
+
+[50] 06/25/2025, 22:24:21 ← 120363410585796672@g.us
+Dikarenakan ada yg mewajibkan mahasiswanya datang tanpa koordinasi ke panitia
+   (Source: firman)
+
+[51] 06/26/2025, 01:21:55 ← ND
+[COMPLEX_MESSAGE]
+   (Type: reactionMessage)
+   (Source: kunco)
+
+[52] 06/26/2025, 01:22:13 ← ND
+Mas @6287889441564, sepertinya butuh 1 laptop lagi
+   (Source: kunco)
+
+[53] 06/26/2025, 06:56:34 ← Ihsan
+Baik pak, nanti saya siapkan perlengkapnnya
+   (Source: kunco)
+
+[54] 06/26/2025, 07:03:15 → Me (Bot/Instance)
+[COMPLEX_MESSAGE]
+   (Type: reactionMessage)
+   (Source: kunco)
+
+[55] 06/26/2025, 07:06:20 → Me (Bot/Instance)
+@62895332028757 @6287889441564 tolong ke kampus bantu dhika terkait media dan dokumentasi 🙏. Terimakasih
+   (Source: kunco)
+
+[56] 06/26/2025, 07:59:21 ← Ihsan
+[COMPLEX_MESSAGE]
+   (Type: reactionMessage)
+   (Source: kunco)
+
+[57] 06/26/2025, 08:15:51 ← Ihsan
+[IMAGEMESSAGE]
+   (Type: imageMessage)
+   (Source: kunco)
+
+[58] 06/26/2025, 08:19:42 → Me (Bot/Instance)
+Ready?
+   (Source: kunco)
+
+[59] 06/26/2025, 08:19:49 → Me (Bot/Instance)
+Mahasiswa sy suruh ke sana ya
+   (Source: kunco)
+
+[60] 06/26/2025, 08:20:23 → Me (Bot/Instance)
+https://youtube.com/live/ThpohmPXXe8?feature=share
+   (Source: kunco)
+
+[61] 06/26/2025, 08:33:23 ← Ihsan
+[IMAGEMESSAGE]
+   (Type: imageMessage)
+   (Source: kunco)
+
+[62] 06/26/2025, 09:05:19 ← Ihsan
+[IMAGE] A4
+   (Type: imageMessage)
+   (Source: kunco)
+
+[63] 06/26/2025, 09:43:00 ← Ihsan
+[IMAGE] Untuk steaming di kelas audionya kecil padahl sudh kita tambhan speaker external
+   (Type: imageMessage)
+   (Source: kunco)
+
+[64] 06/26/2025, 12:14:57 → Me (Bot/Instance)
+Di ruang A masih ada mahasiswa? @6287889441564
+   (Source: kunco)
+
+[65] 06/26/2025, 12:53:34 → Me (Bot/Instance)
+Internet aula down
+   (Source: kunco)
+
+[66] 06/26/2025, 12:53:55 → Me (Bot/Instance)
+@6287889441564
+   (Source: kunco)
+
+[67] 06/26/2025, 15:46:07 ← Ihsan
+[IMAGE] Untuk kabel jaringan & proyektor dan laptop di gedung A sudh d rapihkan pak
+   (Type: imageMessage)
+   (Source: kunco)
+
+[68] 06/26/2025, 16:02:30 ← ND
+[COMPLEX_MESSAGE]
+   (Type: reactionMessage)
+   (Source: kunco)
+
+[69] 06/26/2025, 16:21:11 ← ND
+Mas @6287889441564, jadi ada berapa ht yang sudah kami kembalikan?
+   (Source: kunco)
+
+[70] 06/26/2025, 16:21:56 ← Ihsan
+HT total : 32
+Saat ini : 27 masih kurang 5
+Kabel : 6 
+Saat ini : 5 masih kurang 1
+   (Source: kunco)
+
+[71] 06/26/2025, 16:22:18 ← ND
+[COMPLEX_MESSAGE]
+   (Type: reactionMessage)
+   (Source: kunco)
+
+[72] 06/28/2025, 16:35:03 ← ND
+@6287889441564 yang pegang akun linkedin ISTN siapa?
+   (Source: kunco)
+
+[73] 06/30/2025, 13:11:04 → Me (Bot/Instance)
+@6287889441564 lagi di cbt?
+   (Source: istn)
+
+[74] 06/30/2025, 13:25:08 ← Mega Sakirah
+saya bantu jawab , iya mas lg di cbt sm ahmad juga
+   (Source: istn)
+
+[75] 06/30/2025, 13:27:29 ← Ihsan
+Baru sampe noc pak, iya dr pagi di CBT
+   (Source: istn)
+
+[76] 06/30/2025, 13:36:45 → Me (Bot/Instance)
+cbt aman? kegiatan hari apa aja?
+   (Source: istn)
+
+[77] 06/30/2025, 13:40:37 ← Ihsan
+Aman pak, tdi pagi CBT, lanjut siang ini nyiapin kebutuhan untuk osce internal tgl 3,4 dan 10
+   (Source: istn)
+
+[78] 06/30/2025, 13:41:14 ← Ihsan
+Mas senin tlg koordinasi utk laptop perlu 20 utk hari selasa mulainy
+   (Source: istn)
+
+[79] 06/30/2025, 13:41:20 ← Ihsan
+Info dari bu jeny
+   (Source: istn)
+
+[80] 06/30/2025, 13:43:24 → Me (Bot/Instance)
+ok berarti tolong mulai ditarik hari ini ya laptop2 osce yg dipinjamkan
+   (Source: istn)
+
+[81] 06/30/2025, 13:45:00 ← Ihsan
+Iya pak, lgi hitung kebutuhannya
+   (Source: istn)
+
+[82] 06/30/2025, 15:01:22 → Me (Bot/Instance)
+[IMAGE] @6287889441564 kalau ada dosen baru selesai dibuatkan email istn, bisa diinfokan ke saya supaya user sevimanya menggunakan email tsb (nizar_rachman@istn.ac.id)
+   (Type: imageMessage)
+   (Source: istn)
+
+[83] 06/30/2025, 15:03:52 → Me (Bot/Instance)
+atau tolong ingetin mba maya buat update email pegawai
+   (Source: istn)
+
+[84] 06/30/2025, 15:05:08 ← Ihsan
+Baik pak, nanti saya bantu infokan ke mba maya
+   (Source: istn)
+
+[85] 06/30/2025, 15:38:54 → Me (Bot/Instance)
+[DOCUMENTWITHCAPTIONMESSAGE]
+   (Type: documentWithCaptionMessage)
+   (Source: istn)
+
+[86] 07/01/2025, 13:25:23 → Me (Bot/Instance)
+@62895332028757 mba putri keuangan sudah dikasih akses odoo.istn.ac.id?
+   (Source: istn)
+
+[87] 07/01/2025, 13:25:56 ← Ahmad Budi Gustama
+Udah mas
+   (Source: istn)
+
+
+================================================================
+ULTIMATE EXPORT SUMMARY
+================================================================
+Total unique messages: 87
+Date span: 06/18/2025, 19:29:49 → 07/01/2025, 13:25:56
+
+Message types:
+  • conversation: 59
+  • imageMessage: 16
+  • videoMessage: 1
+  • documentMessage: 2
+  • protocolMessage: 1
+  • audioMessage: 1
+  • unknown: 1
+  • reactionMessage: 5
+  • documentWithCaptionMessage: 1
+
+Source instance distribution:
+  • firman: 50 messages
+  • kunco: 22 messages
+  • istn: 15 messages
+
+Deduplication summary:
+  • Total messages fetched: 150
+  • Unique messages: 87
+  • Duplicates removed: 63

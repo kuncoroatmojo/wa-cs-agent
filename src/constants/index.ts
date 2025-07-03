@@ -275,5 +275,5 @@ export const VALIDATION = {
   NAME_MIN_LENGTH: 2,
   NAME_MAX_LENGTH: 50,
   URL: /^https?:\/\/.+/,
-  PHONE: /^\+?[\d\s\-\(\)]+$/
+  PHONE: /^[+]?[1-9]\d{1,14}$/
 } as const; 

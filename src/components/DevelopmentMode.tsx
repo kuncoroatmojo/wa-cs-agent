@@ -1,28 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { supabase } from '../services/supabase';
+import React from 'react';
 
 interface DevelopmentModeProps {
   children: React.ReactNode;
 }
 
 const DevelopmentMode: React.FC<DevelopmentModeProps> = ({ children }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [missingEnvVars, setMissingEnvVars] = useState<string[]>([]);
-
   const isDevelopment = import.meta.env.DEV;
   const hasSupabaseUrl = !!import.meta.env.VITE_SUPABASE_URL;
   const hasSupabaseKey = !!import.meta.env.VITE_SUPABASE_ANON_KEY;
   const hasEvolutionApiUrl = !!import.meta.env.VITE_EVOLUTION_API_URL;
   const hasEvolutionApiKey = !!import.meta.env.VITE_EVOLUTION_API_KEY;
-
-  useEffect(() => {
-    const missing = [];
-    if (!hasSupabaseUrl) missing.push('VITE_SUPABASE_URL');
-    if (!hasSupabaseKey) missing.push('VITE_SUPABASE_ANON_KEY');
-    if (!hasEvolutionApiUrl) missing.push('VITE_EVOLUTION_API_URL');
-    if (!hasEvolutionApiKey) missing.push('VITE_EVOLUTION_API_KEY');
-    setMissingEnvVars(missing);
-  }, [hasSupabaseUrl, hasSupabaseKey, hasEvolutionApiUrl, hasEvolutionApiKey]);
 
   // Show development banner if in dev mode and missing env vars
   const showDevBanner = isDevelopment && (!hasSupabaseUrl || !hasSupabaseKey || !hasEvolutionApiUrl || !hasEvolutionApiKey);
