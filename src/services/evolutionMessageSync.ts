@@ -378,9 +378,15 @@ export class EvolutionMessageSyncService {
     // Determine if this is a group chat
     const isGroup = remoteJid.includes('@g.us');
     
-    // Extract contact name from latest message or use phone number
-    const contactName = latestMessage.pushName || 
-                       (isGroup ? 'Group Chat' : remoteJid.replace('@s.whatsapp.net', ''));
+    // Extract contact name from messages sent by the contact (not from instance owner)
+    let contactName;
+    if (isGroup) {
+      contactName = 'Group Chat';
+    } else {
+      // For individual chats, find a message from the contact (not from instance owner)
+      const contactMessage = sortedMessages.find(msg => !msg.key?.fromMe && msg.pushName);
+      contactName = contactMessage?.pushName || remoteJid.replace('@s.whatsapp.net', '');
+    }
 
     // First, check if conversation already exists with this external_conversation_id
     const { data: existingConversation } = await this.supabase

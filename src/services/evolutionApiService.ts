@@ -678,10 +678,10 @@ export class EvolutionApiService {
             contactName = `Group ${contactName}`;
           }
         } else {
-          // For individual chats, use pushName
-          const messageWithName = messages.find(m => m.pushName);
-          if (messageWithName?.pushName) {
-            contactName = messageWithName.pushName;
+          // For individual chats, use pushName from contact messages only (not from instance owner)
+          const contactMessage = messages.find(m => !m.key?.fromMe && m.pushName);
+          if (contactMessage?.pushName) {
+            contactName = contactMessage.pushName;
           }
         }
 
@@ -957,9 +957,9 @@ export class EvolutionApiService {
         // For groups, use a generic group name with the group ID
         contactName = `Group ${remoteJid.split('@')[0]}`;
       } else {
-        // For individual contacts, use pushName from messages
-        const firstMessage = messages[0];
-        contactName = firstMessage?.pushName || remoteJid.split('@')[0];
+        // For individual contacts, use pushName from messages sent by the contact (not from instance owner)
+        const contactMessage = messages.find(msg => !msg.key?.fromMe && msg.pushName);
+        contactName = contactMessage?.pushName || remoteJid.split('@')[0];
       }
 
       // Extract contact ID from remoteJid (phone number for WhatsApp)
@@ -1575,18 +1575,18 @@ export class EvolutionApiService {
         try {
           const setWebhookResponse = await this.makeRequest(`/webhook/set/${instanceName}`, 'POST', {
             webhook: {
-              enabled: true,
+            enabled: true,
               url: webhookUrl,
-              webhook_by_events: false, // Don't append event names to URL
-              events: [
-                'MESSAGES_UPSERT',
-                'MESSAGES_UPDATE',
-                'CONNECTION_UPDATE',
-                'CONTACTS_UPDATE',
-                'CHATS_UPDATE',
-                'CHATS_UPSERT',
-                'PRESENCE_UPDATE'
-              ]
+            webhook_by_events: false, // Don't append event names to URL
+            events: [
+              'MESSAGES_UPSERT',
+              'MESSAGES_UPDATE',
+              'CONNECTION_UPDATE',
+              'CONTACTS_UPDATE',
+              'CHATS_UPDATE',
+              'CHATS_UPSERT',
+              'PRESENCE_UPDATE'
+            ]
             }
           });
           
