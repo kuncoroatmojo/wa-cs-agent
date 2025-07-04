@@ -471,12 +471,25 @@ export class EvolutionMessageSyncService {
 
     let existingMessageIds: string[] = [];
     if (externalIds.length > 0) {
-      const { data: existingMessages } = await this.supabase
+      console.log(`🔍 Checking ${externalIds.length} message IDs for duplicates...`);
+      
+      const { data: existingMessages, error: duplicateCheckError } = await this.supabase
         .from('conversation_messages')
         .select('external_message_id')
         .in('external_message_id', externalIds);
       
-      existingMessageIds = existingMessages?.map(m => m.external_message_id) || [];
+      if (duplicateCheckError) {
+        console.error('❌ Error checking for duplicate messages:', duplicateCheckError);
+        // Don't proceed if we can't check for duplicates to avoid conflicts
+        throw new Error(`Failed to check for duplicate messages: ${duplicateCheckError.message}`);
+      }
+      
+      existingMessageIds = existingMessages?.map((m: any) => m.external_message_id) || [];
+      console.log(`Found ${existingMessageIds.length} existing messages out of ${externalIds.length} checked`);
+      
+      if (existingMessageIds.length > 0) {
+        console.log('Sample existing IDs:', existingMessageIds.slice(0, 3));
+      }
     }
 
     // Filter out messages that already exist
@@ -485,6 +498,7 @@ export class EvolutionMessageSyncService {
     );
 
     if (newMessages.length === 0) {
+      console.log(`✅ All ${sortedMessages.length} messages already exist for ${remoteJid}, skipping`);
       return;
     }
 
@@ -525,22 +539,38 @@ export class EvolutionMessageSyncService {
 
       // Pre-filter batch messages to check which ones already exist
       const batchExternalIds = messageInserts.map(m => m.external_message_id);
-      const { data: existingBatchMessages } = await this.supabase
+      console.log(`🔍 Double-checking batch of ${batchExternalIds.length} messages for duplicates...`);
+      
+      const { data: existingBatchMessages, error: batchCheckError } = await this.supabase
         .from('conversation_messages')
         .select('external_message_id')
         .in('external_message_id', batchExternalIds);
       
-      const existingBatchIds = existingBatchMessages?.map(m => m.external_message_id) || [];
-      const newMessagesToInsert = messageInserts.filter(m => 
+      if (batchCheckError) {
+        console.error('❌ Error checking batch for duplicates:', batchCheckError);
+        // Skip this batch to avoid conflicts
+        console.log(`⏭️  Skipping batch due to duplicate check error`);
+        continue;
+      }
+      
+      const existingBatchIds = existingBatchMessages?.map((m: any) => m.external_message_id) || [];
+      const newMessagesToInsert = messageInserts.filter((m: any) => 
         !existingBatchIds.includes(m.external_message_id)
       );
+      
+      if (existingBatchIds.length > 0) {
+        console.log(`Found ${existingBatchIds.length} duplicates in batch, inserting ${newMessagesToInsert.length} new messages`);
+      }
 
-      // Insert only truly new messages using regular insert (no upsert)
+      // Insert only truly new messages using upsert with ignore conflict for safety
       if (newMessagesToInsert.length > 0) {
         try {
           const { error: insertError } = await this.supabase
             .from('conversation_messages')
-            .insert(newMessagesToInsert);
+            .upsert(newMessagesToInsert, {
+              onConflict: 'external_message_id',
+              ignoreDuplicates: true
+            });
 
           if (insertError) {
             // Handle any remaining conflicts with individual inserts
