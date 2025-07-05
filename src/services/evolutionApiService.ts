@@ -738,7 +738,7 @@ export class EvolutionApiService {
 
       // Pre-filter to check which messages already exist to avoid 400 errors from upsert conflicts
       const externalMessageIds = messagesToInsert
-        .map(m => m.external_message_id)
+        .map((m: any) => m.external_message_id)
         .filter(Boolean);
 
       let existingMessageIds: string[] = [];
@@ -748,7 +748,7 @@ export class EvolutionApiService {
           .select('external_message_id')
           .in('external_message_id', externalMessageIds);
         
-        existingMessageIds = existingMessages?.map(m => m.external_message_id) || [];
+        existingMessageIds = existingMessages?.map((m: any) => m.external_message_id) || [];
       }
 
       // Filter out messages that already exist
@@ -769,7 +769,10 @@ export class EvolutionApiService {
           try {
             const { error: insertError } = await supabase
               .from('conversation_messages')
-              .insert(batch);
+              .upsert(batch, {
+                onConflict: 'external_message_id',
+                ignoreDuplicates: true
+              });
 
             if (insertError) {
               
@@ -778,7 +781,10 @@ export class EvolutionApiService {
                 try {
                   await supabase
                     .from('conversation_messages')
-                    .insert(messageData);
+                    .upsert(messageData, {
+                      onConflict: 'external_message_id',
+                      ignoreDuplicates: true
+                    });
                   _successfulInserts++;
                 } catch (individualError: any) {
                   if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
@@ -797,7 +803,10 @@ export class EvolutionApiService {
               try {
                 await supabase
                   .from('conversation_messages')
-                  .insert(messageData);
+                  .upsert(messageData, {
+                    onConflict: 'external_message_id',
+                    ignoreDuplicates: true
+                  });
                 _successfulInserts++;
               } catch (individualError: any) {
                 if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
@@ -1055,7 +1064,7 @@ export class EvolutionApiService {
 
       // Pre-filter to check which messages already exist to avoid 400 errors from upsert conflicts
       const externalMessageIds = messagesToInsert
-        .map(m => m.external_message_id)
+        .map((m: any) => m.external_message_id)
         .filter(Boolean);
 
       let existingMessageIds: string[] = [];
@@ -1065,7 +1074,7 @@ export class EvolutionApiService {
           .select('external_message_id')
           .in('external_message_id', externalMessageIds);
         
-        existingMessageIds = existingMessages?.map(m => m.external_message_id) || [];
+        existingMessageIds = existingMessages?.map((m: any) => m.external_message_id) || [];
       }
 
       // Filter out messages that already exist
@@ -1086,7 +1095,10 @@ export class EvolutionApiService {
           try {
             const { error: insertError } = await supabase
               .from('conversation_messages')
-              .insert(batch);
+              .upsert(batch, {
+                onConflict: 'external_message_id',
+                ignoreDuplicates: true
+              });
 
             if (insertError) {
               
@@ -1095,7 +1107,10 @@ export class EvolutionApiService {
                 try {
                   await supabase
                     .from('conversation_messages')
-                    .insert(messageData);
+                    .upsert(messageData, {
+                      onConflict: 'external_message_id',
+                      ignoreDuplicates: true
+                    });
                   _successfulInserts++;
                 } catch (individualError: any) {
                   if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
@@ -1114,7 +1129,10 @@ export class EvolutionApiService {
               try {
                 await supabase
                   .from('conversation_messages')
-                  .insert(messageData);
+                  .upsert(messageData, {
+                    onConflict: 'external_message_id',
+                    ignoreDuplicates: true
+                  });
                 _successfulInserts++;
               } catch (individualError: any) {
                 if (!individualError?.message?.includes('duplicate') && !individualError?.message?.includes('unique')) {
