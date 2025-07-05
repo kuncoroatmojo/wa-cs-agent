@@ -306,26 +306,27 @@ async function handleMessageUpsert(supabase: any, event: EvolutionWebhookEvent) 
 
     let messageError = null
     
-    // Only insert if message doesn't exist
-    if (!existingMessage) {
-      const insertResult = await supabase
-        .from('conversation_messages')
-        .insert({
-          conversation_id: conversation.id,
-          content: messageContent,
-          message_type: unifiedMessageType,
-          direction: key.fromMe ? 'outbound' : 'inbound',
-          sender_type: key.fromMe ? 'agent' : 'contact', // Changed from 'bot' to 'agent' for consistency
-          sender_name: pushName,
-          sender_id: key.fromMe ? instance : key.remoteJid,
-          status: 'delivered',
-          external_message_id: key.id,
-          external_timestamp: new Date(messageTimestamp * 1000).toISOString(),
-          external_metadata: data
-        })
-      
-      messageError = insertResult.error
-    }
+    // Use upsert with ignoreDuplicates to avoid 409 conflicts
+    const { error: upsertError } = await supabase
+      .from('conversation_messages')
+      .upsert({
+        conversation_id: conversation.id,
+        content: messageContent,
+        message_type: unifiedMessageType,
+        direction: key.fromMe ? 'outbound' : 'inbound',
+        sender_type: key.fromMe ? 'agent' : 'contact', // Changed from 'bot' to 'agent' for consistency
+        sender_name: pushName,
+        sender_id: key.fromMe ? instance : key.remoteJid,
+        status: 'delivered',
+        external_message_id: key.id,
+        external_timestamp: new Date(messageTimestamp * 1000).toISOString(),
+        external_metadata: data
+      }, { 
+        ignoreDuplicates: true,
+        onConflict: 'external_message_id'
+      })
+    
+    messageError = upsertError
 
     if (messageError) {
       console.error('❌ Error inserting message:', messageError)

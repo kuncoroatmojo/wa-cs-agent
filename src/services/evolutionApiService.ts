@@ -705,7 +705,7 @@ export class EvolutionApiService {
             sync_status: 'synced',
             updated_at: new Date().toISOString()
           }, {
-            onConflict: 'user_id,external_conversation_id,instance_key'
+            onConflict: 'user_id,integration_type,contact_id'
           })
           .select('id')
           .single();
@@ -1030,7 +1030,7 @@ export class EvolutionApiService {
             contact_metadata: {},
             updated_at: new Date().toISOString()
           }, {
-            onConflict: 'user_id,external_conversation_id,instance_key'
+            onConflict: 'user_id,integration_type,contact_id'
           })
           .select('id')
           .single();

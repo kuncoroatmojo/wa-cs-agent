@@ -232,7 +232,7 @@ export class ConversationService {
           ...conversation,
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'user_id,external_conversation_id,instance_key'
+          onConflict: 'user_id,integration_type,contact_id'
         })
         .select()
         .single();
